@@ -37,9 +37,15 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set in .env}
       DATABASE_URL: postgresql://${LITELLM_DB_USER}:${LITELLM_DB_PASSWORD}@db:5432/${LITELLM_DB_NAME}
       DISABLE_ADMIN_UI: "True"
+      NO_DOCS: "True"
+      NO_REDOC: "True"
       # No provider keys are passed through. Add them only after explicit opt-in.
     volumes:
       - ../services/litellm/config.yaml:/app/config.yaml:ro
+      # Replaces the bundled admin UI with an inert stub (see services/litellm/ui-disabled/).
+      # The proxy runs from the venv copy of the package, so that is the path to shadow.
+      # Re-verify this path whenever the LiteLLM image tag changes (test_litellm_ui_replaced).
+      - ../services/litellm/ui-disabled:/app/.venv/lib/python3.13/site-packages/litellm/proxy/_experimental/out:ro
     depends_on:
       db:
         condition: service_healthy
@@ -52,6 +58,21 @@ services:
     # "data" for DB + API access; "egress" only so it can reach model providers later.
     networks: [data, egress]
 
+  migrate:
+    # One-shot: applies Alembic migrations, then exits. Safe to re-run.
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+
   api:
     build:
       context: ..
@@ -60,8 +81,9 @@ services:
     restart: unless-stopped
     environment:
       ABU_ENV: ${ABU_ENV:-development}
-      ABU_DATABASE_URL: postgresql+asyncpg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+      ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
       ABU_LITELLM_BASE_URL: http://litellm:4000
+      ABU_LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
     ports:
       # Loopback only. Public access goes through Caddy (Milestone 9).
       - "127.0.0.1:8000:8000"
@@ -70,6 +92,8 @@ services:
         condition: service_healthy
       litellm:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks: [data, edge]
 
 volumes:

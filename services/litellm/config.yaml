@@ -1,10 +1,15 @@
-# Safe initial LiteLLM configuration.
+# LiteLLM configuration. LiteLLM stays on the private Docker network.
 #
-# - No models and no provider keys: nothing here can reach a paid (or any) provider.
-# - Models are added in Milestone 2+ from the application-owned Model Registry;
-#   Abu AI, not LiteLLM, is the source of truth for approval and spending policy.
-# - Gateway-level budget is a second line of defence behind the application ledger.
-model_list: []
+# - The ONLY model is a mock: it returns a canned response and contacts no provider.
+#   Real provider models are added only after registry approval (Abu AI's Model Registry is the
+#   source of truth for approval and spending policy; LiteLLM is transport + a second guard).
+# - No provider API keys are configured or passed through.
+model_list:
+  - model_name: abu-mock
+    litellm_params:
+      model: openai/abu-mock
+      api_key: not-a-real-key   # never used: mock_response short-circuits the provider call
+      mock_response: "This is a canned response from the LiteLLM gateway mock model."
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
@@ -13,6 +18,9 @@ general_settings:
 litellm_settings:
   telemetry: false
   drop_params: true
-  # Global gateway ceiling of zero until a paid provider is explicitly opted in.
-  max_budget: 0
+  # IMPORTANT: LiteLLM only enforces max_budget when it is > 0. A value of 0 means "no limit"
+  # (verified in v1.83.14-stable.patch.3: auth_checks.py `litellm.max_budget > 0`).
+  # So this is a tiny positive USD ceiling, a second guard behind the application-level ledger
+  # (Milestone 4) which owns the INR 300/month limit. Tests reject values <= 0.
+  max_budget: 0.01
   budget_duration: 30d

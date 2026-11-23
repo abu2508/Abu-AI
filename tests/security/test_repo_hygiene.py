@@ -42,10 +42,31 @@ def test_litellm_ui_flag_set_and_no_provider_keys() -> None:
     assert not [k for k in env if k.endswith("_API_KEY")]
 
 
-def test_litellm_config_has_no_models_or_hardcoded_secrets() -> None:
-    cfg = yaml.safe_load((ROOT / "services/litellm/config.yaml").read_text())
-    assert cfg["model_list"] == []
-    assert cfg["general_settings"]["master_key"].startswith("os.environ/")
+LITELLM_CFG = yaml.safe_load((ROOT / "services/litellm/config.yaml").read_text())
+
+
+def test_litellm_has_only_mock_models() -> None:
+    """No real provider may be configured: every model must short-circuit with mock_response."""
+    assert LITELLM_CFG["model_list"], "expected the mock model"
+    for entry in LITELLM_CFG["model_list"]:
+        assert "mock_response" in entry["litellm_params"], entry["model_name"]
+
+
+def test_litellm_master_key_from_env() -> None:
+    assert LITELLM_CFG["general_settings"]["master_key"].startswith("os.environ/")
+
+
+def test_litellm_max_budget_is_positive() -> None:
+    """LiteLLM treats max_budget <= 0 as 'no limit' (checks are guarded by `> 0`)."""
+    assert LITELLM_CFG["litellm_settings"]["max_budget"] > 0
+
+
+def test_litellm_ui_stub_is_inert() -> None:
+    stub = ROOT / "services/litellm/ui-disabled"
+    assert [p.name for p in stub.iterdir() if p.name != "_next"] == ["index.html"]
+    assert [p.name for p in (stub / "_next").iterdir()] == [".gitkeep"]
+    mounts = COMPOSE["services"]["litellm"]["volumes"]
+    assert any(m.endswith("site-packages/litellm/proxy/_experimental/out:ro") for m in mounts)
 
 
 def test_env_example_has_only_placeholders() -> None:

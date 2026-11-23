@@ -13,5 +13,5 @@ def create_engine(settings: Settings) -> AsyncEngine | None:
         pool_size=5,
         max_overflow=5,
         pool_pre_ping=True,
-        connect_args={"timeout": settings.dependency_timeout_seconds},
+        connect_args={"connect_timeout": max(1, int(settings.dependency_timeout_seconds))},
     )

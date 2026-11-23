@@ -11,6 +11,8 @@ COPY services ./services
 COPY core ./core
 COPY agents ./agents
 COPY domain ./domain
+COPY database ./database
+COPY alembic.ini ./
 RUN useradd --system --uid 10001 --no-create-home abu
 USER abu
 ENV PATH="/app/.venv/bin:$PATH"
