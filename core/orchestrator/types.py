@@ -60,12 +60,32 @@ class PreparedPrompt:
     messages: list[Message]
 
 
+@dataclass(frozen=True)
+class ToolCall:
+    """A tool invocation PLANNED by workflow code (never by a model). `name` must be in the workflow's allowlist."""
+
+    name: str
+    args: dict[str, Any]
+
+
 class WorkflowHandler(Protocol):
-    """Domain extension point. A future finance/messaging/coach workflow supplies its own handler."""
+    """Domain extension point: a workflow supplies its prompt, its (deterministic) tool plan and its summary."""
 
     def build_messages(
-        self, spec: "WorkflowSpec", message: str, context_block: str | None, *, repair: bool
+        self,
+        spec: "WorkflowSpec",
+        message: str,
+        context_block: str | None,
+        *,
+        repair: bool,
+        data_block: str | None = None,
     ) -> list[Message]: ...
+
+    def plan_tools(
+        self, spec: "WorkflowSpec", message: str, conversation_id: uuid.UUID | None
+    ) -> list[ToolCall]: ...
+
+    def summarise(self, results: dict[str, Any]) -> str | None: ...
 
 
 @dataclass(frozen=True)
@@ -143,6 +163,12 @@ class OrchestratorResponse(BaseModel):
     context: ContextInfo = Field(default_factory=ContextInfo)
     memory_proposals: list[MemoryProposalOut] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)
+    data: dict[str, Any] | None = (
+        None  # deterministic results from the user's own records (money as strings)
+    )
+    summary: str | None = (
+        None  # templated text built from `data`: no model wording, no invented figures
+    )
     warnings: list[str] = Field(default_factory=list)
     error: dict[str, str] | None = None
     replayed: bool = False
@@ -169,6 +195,8 @@ class RunScope:
     raw_output: str | None = None
     output: Any = None
     step_limit: int = 24
+    conversation_id: uuid.UUID | None = None
+    tool_results: dict[str, Any] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
 

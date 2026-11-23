@@ -20,6 +20,7 @@ the server and database credentials, which no enrolled device ever holds.
   python -m services.admin executions list [--limit 20]
   python -m services.admin orchestrator bootstrap-mock [--user-memory finance_agent,...]   (grant mock alias + own memory, activate, enable)
   python -m services.admin orchestrator purge                (scrub expired idempotent replies; delete old run history)
+  python -m services.admin domain purge|stats                (delete expired imported messages; row counts only)
   python -m services.admin memory stats
   python -m services.admin memory purge-expired            (retention: proposals, third-party summaries, threads...)
   python -m services.admin memory add-key --file KEYRING --id k2   (HOST command: adds+activates a new master key)
@@ -34,9 +35,11 @@ import uuid
 from collections.abc import Awaitable, Callable
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agents.tools import AGENT_TOOLS
+from agents.workflows import domain_registry, domain_tool_registry
 from core.agent_registry import service as agents
 from core.audit.service import ADMIN
 from core.governance import killswitch, spending
@@ -50,7 +53,19 @@ from core.orchestrator.bootstrap import bootstrap_mock_agents
 from core.orchestrator.idempotency import RunStore
 from core.permissions.errors import PermissionDeniedError
 from core.permissions.tools import DEFAULT_TOOLS
-from database.schemas import Agent, Execution, MemoryMode
+from database.schemas import (
+    Agent,
+    CoachEvent,
+    CoachGoal,
+    CoachHabit,
+    CoachTask,
+    Execution,
+    FinAccount,
+    FinTransaction,
+    MemoryMode,
+    MsgConversation,
+    MsgMessage,
+)
 from services.api.auth import service as auth
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine
@@ -184,7 +199,14 @@ async def executions_cmd(s: AsyncSession, _: Settings, a: argparse.Namespace) ->
 async def orchestrator_cmd(s: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
     if a.action == "bootstrap-mock":
         grants = [x for x in (a.user_memory or "").split(",") if x]
-        result = await bootstrap_mock_agents(s, ADMIN, user_memory_for=grants)
+        result = await bootstrap_mock_agents(
+            s,
+            ADMIN,
+            domain_registry(),
+            user_memory_for=grants,
+            agent_tools=AGENT_TOOLS,
+            tool_registry=domain_tool_registry(),
+        )
         for agent_id, outcome in result.items():
             print(f"{agent_id}: {outcome} (mock model only; no external provider)")
     elif a.action == "purge":
@@ -196,6 +218,28 @@ async def orchestrator_cmd(s: AsyncSession, cfg: Settings, a: argparse.Namespace
         )
         print("scrubbed replies:", await store.scrub_expired())
         print("deleted runs:", await store.purge(cfg.orchestrator_run_retention_days))
+
+
+async def domain_cmd(s: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
+    if a.action == "purge":
+        n = (
+            await s.execute(delete(MsgMessage).where(MsgMessage.expires_at <= func.now()))
+        ).rowcount  # type: ignore[attr-defined]
+        print("deleted expired imported messages:", n)
+    elif a.action == "stats":  # counts only: nothing about content
+        for model in (
+            FinAccount,
+            FinTransaction,
+            MsgConversation,
+            MsgMessage,
+            CoachGoal,
+            CoachTask,
+            CoachHabit,
+            CoachEvent,
+        ):
+            print(
+                f"{model.__tablename__}: {(await s.execute(select(func.count()).select_from(model))).scalar_one()}"
+            )
 
 
 async def memory_cmd(_: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
@@ -315,6 +359,8 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     mem.add_argument("--confirm")
     mem.add_argument("--file")
     mem.add_argument("--id")
+    dom = add("domain", domain_cmd)
+    dom.add_argument("action", choices=["purge", "stats"])
     orc = add("orchestrator", orchestrator_cmd)
     orc.add_argument("action", choices=["bootstrap-mock", "purge"])
     orc.add_argument(

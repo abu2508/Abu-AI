@@ -5,9 +5,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from agents.tools import ToolDeps, build_registry
+from agents.workflows import domain_registry
 from core.governance.service import Governance
 from core.memory.runtime import build_keyring, open_runtime, verify_embedding_dimension
 from core.orchestrator.orchestrator import Orchestrator
+from domain.common.crypto import FieldCipher
 from services.api import agents, coach, finance, governance, health, memory, messaging, orchestrator
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
@@ -38,6 +41,7 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
                 app.state.memory = await open_runtime(settings)
                 async with app.state.sessionmaker() as s:
                     await verify_embedding_dimension(s, app.state.memory.embedder)
+                cipher = FieldCipher(app.state.memory.envelope, settings.token_hash_key)  # type: ignore[arg-type]
                 app.state.orchestrator = Orchestrator(
                     app.state.sessionmaker,
                     Governance(app.state.sessionmaker),
@@ -45,6 +49,8 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
                     token_hash_key=settings.token_hash_key,  # type: ignore[arg-type]
                     response_ttl_hours=settings.orchestrator_response_ttl_hours,
                     thread_days=settings.retention_thread_days,
+                    registry=domain_registry(),
+                    tool_factory=lambda session: build_registry(ToolDeps(session, cipher)),
                 )
             yield
         finally:

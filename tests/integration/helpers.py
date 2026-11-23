@@ -178,3 +178,19 @@ def scan_database(url: URL, needles: dict[str, bytes]) -> dict[str, list[str]]:
     finally:
         engine.dispose()
     return found
+
+
+async def bootstrap_domain_agents(session: AsyncSession, **kw: object) -> dict[str, str]:
+    """What the operator does with `admin orchestrator bootstrap-mock`: the domain registry, tool grants and all."""
+    from agents.tools import AGENT_TOOLS
+    from agents.workflows import domain_registry, domain_tool_registry
+    from core.orchestrator.bootstrap import bootstrap_mock_agents
+
+    return await bootstrap_mock_agents(
+        session,
+        ADMIN,
+        domain_registry(),
+        agent_tools=AGENT_TOOLS,
+        tool_registry=domain_tool_registry(),
+        **kw,  # type: ignore[arg-type]
+    )

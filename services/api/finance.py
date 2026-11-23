@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from domain.finance import analytics as an
-from domain.finance.money import ParseError, parse_amount
+from domain.finance.money import ParseError
 from domain.finance.normalize import CATEGORIES
 from domain.finance.service import FinanceError, FinanceService, Outcome
 from domain.finance.types import RawTxn
@@ -96,10 +96,6 @@ class SubscriptionIn(Body):
     amount: Amount
     period: Literal["weekly", "monthly", "yearly"]
     next_due: date
-
-
-def svc(session: SessionDep, cipher: CipherDep, request: Request) -> FinanceService:
-    return FinanceService(session, cipher)
 
 
 def _fail(exc: FinanceError) -> JSONResponse:
@@ -571,6 +567,3 @@ async def upcoming(
     days: Annotated[int, Query(ge=1, le=90)] = 14,
 ) -> Any:
     return _json(await FinanceService(session, cipher).upcoming(principal.user_id, days))
-
-
-__all__ = ["parse_amount", "router"]

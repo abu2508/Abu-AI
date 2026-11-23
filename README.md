@@ -344,14 +344,15 @@ erase-user`.
 
 ## Orchestrator (Milestone 6) - mock workflows only
 
-The orchestrator is the single, governed entry point from a user request to an agent. **Every workflow is
+The orchestrator is the single, governed entry point from a user request to an agent. **Every workflow's model is
 a mock**: it runs the real pipeline (classification, routing, permissions, memory, spending, validation,
-audit) against the in-process mock model and returns a placeholder reply labelled `mock: true`. No
-finance, messaging or coaching functionality exists yet, and no external model provider is wired in
+audit) against the in-process mock model and returns a placeholder reply labelled `mock: true`. (This section
+describes the Milestone 6 orchestrator; the domain logic added in Milestone 7 is described in the next section.)
+No external model provider is wired in
 (`Orchestrator` composes only `MockAdapter`; a test blocks every non-loopback connection).
 
 ```
-POST /v1/orchestrator/run   {"message": "..."}  + Authorization: Bearer ..  [+ Idempotency-Key: 16-128 chars]
+POST /v1/orchestrator/run   {"message": "...", "conversation_id": optional}  + Authorization: Bearer ..  [+ Idempotency-Key: 16-128 chars]
 GET  /v1/orchestrator/runs[?limit&before]        own run history (metadata only)
 GET  /v1/orchestrator/runs/{id}                  own run status (+ reply while its encrypted copy has not expired)
 GET  /v1/orchestrator/workflows                  registered workflows and their bounds
@@ -419,6 +420,54 @@ Other Milestone 6 limits: the rule-based classifier is brittle (unusual phrasing
 conversational context; misses degrade to clarification/general, never to an action); the mock model
 proves orchestration, not answer quality; `general_agent` is a fourth agent beyond the three mandatory
 ones; the 24 h reply cache is the only place a reply is persisted and only when a key is sent.
+
+## Domain agents (Milestone 7)
+
+The three agents now have real, **deterministic** domain logic behind the Milestone 6 orchestrator. The model is
+still the in-process mock: it only supplies placeholder wording. Every number, plan and draft comes from code.
+
+**Two ways in, one set of rules.**
+1. *Your own data* - `/v1/finance`, `/v1/messaging`, `/v1/coach`: authenticated, always acting as you, available
+   even when the kill switch is on (it stops agents and tools, not your access to your data). Manual and voice
+   entry, imports, review, budgets, loans, goals, tasks, habits, calendar import, reminders, deletion.
+2. *The agents* - `POST /v1/orchestrator/run` routes to a subtype workflow (finance: budgets, subscriptions,
+   loans, cards, statements, transactions; messaging: reply assist, conversation summary; coach: briefing,
+   review, plan, goals, habits). A workflow's code plans up to four **READ-only tools** (`agents/tools.py`) that
+   run through `ToolExecutor` (kill switch, per-version grant, strict schema, step/time limits, audit). A model
+   never picks a tool, a user, a conversation or a number. The response carries `data` (exact figures; money is a
+   string) and a templated `summary`.
+
+There is no tool or route that pays, transfers, sends, forwards or posts anything (a test asserts it).
+
+| Area | What exists |
+|---|---|
+| Finance | accounts (bank, card, cash, wallet); transactions; **notification ingestion** (`POST /v1/finance/ingest`: SMS/email/Shortcut/Share text -> parser registry; raw text discarded; waits in a review queue unless the account opts into auto-confirm); voice entry (a transcript string); CSV, Excel and PDF statement import; duplicate detection (exact + fuzzy, flagged not dropped); reconciliation of alerts with statement rows; rule-based categories + your own merchant rules; loans and exact EMI/amortisation; subscriptions (declared + detected); budgets; cash flow; card utilisation; templated insights |
+| Messaging | contacts and per-conversation context; **import only what you choose** (WhatsApp-style export, labelled paste, JSON for Shortcuts); per-conversation sharing flag gates the agent; needs-reply, response times, intent, tone; template reply drafts (labelled draft-only); memory namespace `messaging_agent/<platform>/<conversation>`; encrypted bodies with a retention period |
+| Coach | goals, tasks, habits and streaks, calendar events (local store + `.ics` import behind a `CalendarProvider` protocol), reminders (the app polls `/reminders/due`; `ReminderChannel` protocol for push later), check-ins, deterministic prioritisation and time-blocked daily plan, morning briefing, evening review, progress |
+
+**No bank connection, no Account Aggregator, no assumption of iOS notification access.** The ingestion endpoint is
+the only contract: an iOS Shortcut or Share Extension later just calls it. The alert formats parsed today are
+synthetic examples of common styles; real-sample hardening waits for the deployment gates.
+
+**Privacy.** Names, descriptions, titles, notes and message bodies are envelope-encrypted per field (same keyring
+as memory, keys outside the database). Amounts, dates, categories and keyed hashes stay plaintext columns because
+constraints, indexes and exact arithmetic need them - that trade-off is why the disk-encryption gate below matters.
+Raw notifications, statements, ICS files and chats are never stored as files. Message bodies are never embedded and
+never copied into memory; the one memory path is a content-free conversation summary proposed as a pending,
+third-party memory (every agent memory proposal waits for your approval). `erase` removes all of it.
+
+**Money correctness.** `Decimal` throughout, half-up to paise at defined points, API money as strings. EMI and the
+amortisation schedule are tested against hand-worked figures (the final instalment absorbs rounding so the balance
+closes at exactly 0.00). Alerts awaiting review are never counted in totals.
+
+Operator: `admin orchestrator bootstrap-mock` now also grants each agent its READ tools (an existing Milestone 6
+deployment gets a **new version** with the grants; old versions are never edited). `admin domain purge|stats`.
+
+Unresolved Milestone 7 risks: untrusted PDF/Excel parsing is an attack surface (hard limits, `data_only`, no stored
+file - not a sandbox); bank formats vary and only synthetic formats were tested; categorisation is keyword rules;
+alerts auto-confirmed by an opted-in account are only as accurate as the parser; plaintext amounts at rest depend on
+disk encryption; reply drafts are templates until a real model is approved; planning ignores travel time and recurring
+calendar events (skipped, counted); the four deployment gates below are still open.
 
 ## Prerequisites
 

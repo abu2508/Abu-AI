@@ -9,6 +9,9 @@ a WorkflowSpec for (intent, subtype), and grant the agent version what it needs.
 graph and every governance check stay unchanged.
 """
 
+import uuid
+from typing import Any
+
 from core.memory import namespaces as ns_rules
 from core.model_router import contract
 from core.model_router.types import Message
@@ -20,9 +23,11 @@ from core.orchestrator.types import (
     Intent,
     OrchestratorError,
     RouteDecision,
+    ToolCall,
     WorkflowHandler,
     WorkflowSpec,
 )
+from core.permissions.tools import ToolRegistry, ToolRisk
 
 MOCK_MODEL_ALIAS = "test-mock"  # routes to the in-process mock model only (see database/seed)
 FRONT_DESK_AGENT = "general_agent"  # answers clarification / unsupported / general requests
@@ -36,13 +41,20 @@ _OUTPUT_RULES = (
 
 
 class MockWorkflowHandler:
-    """Builds the prompt for a mock workflow. The SYSTEM message is written here, never from user text."""
+    """Builds the prompt for a workflow. The SYSTEM message is written here, never from user text.
+    This base class plans no tools; domain handlers (see agents/) subclass it."""
 
     def __init__(self, role: str) -> None:
         self._role = role
 
     def build_messages(
-        self, spec: WorkflowSpec, message: str, context_block: str | None, *, repair: bool
+        self,
+        spec: WorkflowSpec,
+        message: str,
+        context_block: str | None,
+        *,
+        repair: bool,
+        data_block: str | None = None,
     ) -> list[Message]:
         system = [contract.MARKER, f"Workflow: {spec.name}", f"Role: {self._role}", _OUTPUT_RULES]
         if repair:
@@ -54,25 +66,48 @@ class MockWorkflowHandler:
             out.append(
                 Message(role="user", content=context_block)
             )  # quoted DATA block with its own preface
+        if data_block:
+            out.append(
+                Message(role="user", content=data_block)
+            )  # deterministic results, also quoted DATA
         out.append(Message(role="user", content=message))
         return out
 
+    def plan_tools(
+        self, spec: WorkflowSpec, message: str, conversation_id: uuid.UUID | None
+    ) -> list[ToolCall]:
+        return []
+
+    def summarise(self, results: dict[str, Any]) -> str | None:
+        return None
+
 
 class WorkflowRegistry:
-    MAX_STEPS, MAX_TIMEOUT, MAX_RETRIES, MAX_PROPOSALS = 50, 120, 3, 5
+    MAX_STEPS, MAX_TIMEOUT, MAX_RETRIES, MAX_PROPOSALS, MAX_TOOLS = 50, 120, 3, 5, 4
 
-    def __init__(self) -> None:
+    def __init__(self, tools: ToolRegistry | None = None) -> None:
+        """`tools`: the code-defined tool registry a workflow's allowlist is validated against. Without it no
+        workflow may name a tool."""
         self._by_key: dict[tuple[Intent, str | None], WorkflowSpec] = {}
+        self._tools = tools
 
-    def register(self, spec: WorkflowSpec, *, allow_tools: bool = False) -> None:
+    def register(self, spec: WorkflowSpec) -> None:
         if not SLUG.match(spec.name):
             raise ValueError(f"invalid workflow name {spec.name!r}")
         if spec.intent not in ROUTABLE:
             raise ValueError(f"{spec.intent.value} is not a routable intent")
-        if spec.tool_allowlist and not allow_tools:
-            raise ValueError(
-                "tools are not available in this milestone: tool_allowlist must be empty"
-            )
+        for tool in spec.tool_allowlist:
+            known = self._tools.get(tool) if self._tools is not None else None
+            if known is None:
+                raise ValueError(
+                    f"unknown tool {tool!r}: a workflow may only name registered tools"
+                )
+            if known.risk is not ToolRisk.READ:
+                raise ValueError(
+                    f"tool {tool!r} is not read-only: workflows may only use READ tools"
+                )
+        if len(spec.tool_allowlist) > self.MAX_TOOLS:
+            raise ValueError("too many tools for one workflow")
         if not (
             1 <= spec.max_graph_steps <= self.MAX_STEPS
             and 1 <= spec.timeout_seconds <= self.MAX_TIMEOUT

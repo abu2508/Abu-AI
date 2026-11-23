@@ -15,6 +15,7 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Any
 
@@ -48,6 +49,7 @@ from core.orchestrator.types import (
 )
 from core.orchestrator.workflows import Router, WorkflowRegistry, default_registry
 from core.permissions.errors import LimitExceededError, PermissionDeniedError
+from core.permissions.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +142,9 @@ class Orchestrator:
         adapters: dict[str, ProviderAdapter] | None = None,
         response_ttl_hours: int = 24,
         thread_days: int = 7,
+        tool_factory: Callable[[AsyncSession], ToolRegistry] | None = None,
     ) -> None:
+        self._tool_factory = tool_factory
         self._f = factory
         self._gov = governance
         self._memory = memory
@@ -165,8 +169,11 @@ class Orchestrator:
         *,
         idempotency_key: str | None = None,
         trace_id: str | None = None,
+        conversation_id: uuid.UUID | None = None,
     ) -> OrchestratorResponse:
-        return await self._execute(user_id, message, "user", idempotency_key, trace_id)
+        return await self._execute(
+            user_id, message, "user", idempotency_key, trace_id, conversation_id
+        )
 
     async def run_scheduled_task(
         self, user_id: uuid.UUID, task: ScheduledTask
@@ -183,6 +190,7 @@ class Orchestrator:
         origin: str,
         idem_key: str | None,
         trace_id: str | None,
+        conversation_id: uuid.UUID | None = None,
     ) -> OrchestratorResponse:
         message = message.strip()
         if not message or len(message) > MAX_MESSAGE_CHARS or "\x00" in message:
@@ -195,7 +203,9 @@ class Orchestrator:
             _, _, code, http, msg = _classify_error(exc)
             raise OrchestratorError(code, msg, http) from None
 
-        key_hash, req_hash = self.store.hashes(user_id, message, idem_key)
+        key_hash, req_hash = self.store.hashes(
+            user_id, message + "\x1f" + (str(conversation_id) if conversation_id else ""), idem_key
+        )
         claim = await self.store.claim(user_id, origin, key_hash, req_hash)
         if claim.replay is not None:
             stored = self.store.open_response(claim.replay)
@@ -213,7 +223,7 @@ class Orchestrator:
             )
 
         run_id = claim.run_id
-        scope = RunScope(user_id=user_id, run_id=run_id)
+        scope = RunScope(user_id=user_id, run_id=run_id, conversation_id=conversation_id)
         state: dict[str, Any] = {}
         status, reason, err = "succeeded", None, None
         async with self._f() as session:
@@ -229,6 +239,7 @@ class Orchestrator:
                     else None
                 ),
                 task_type="orchestrator.request",
+                tool_factory=self._tool_factory,
             )
             scope.gateway = deps.gateway
             try:
@@ -305,7 +316,17 @@ class Orchestrator:
         ctx = scope.ctx
         status = str(state["status"])
         question = state.get("question")
+        results = {
+            k: (
+                {kk: vv for kk, vv in v.items() if kk != "memory_proposal"}
+                if isinstance(v, dict)
+                else v
+            )
+            for k, v in scope.tool_results.items()
+        }
         return OrchestratorResponse(
+            data=results or None,
+            summary=scope.spec.handler.summarise(results) if results and scope.spec else None,
             run_id=run_id,
             execution_id=ctx.execution_id,
             trace_id=ctx.trace_id,

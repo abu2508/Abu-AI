@@ -33,7 +33,7 @@ def _r(code: str, pattern: str, weight: int = 2) -> Rule:
 FINANCE = [
     _r(
         "money_words",
-        r"\b(budget|expenses?|spending|spent|income|salary|savings?|invest(ment|ing)?s?|tax(es)?|net worth)\b",
+        r"\b(budget|expenses?|spending|spent|income|salary|savings?|invest(ment|ing)?s?|tax(es)?|net worth|subscriptions?)\b",
         3,
     ),
     _r(
@@ -59,7 +59,17 @@ MESSAGING = [
         r"\b(reply|respond|answer)\b.{0,25}\b(to|him|her|them|message|text|dm)\b|\bwhat (should|do) i (say|reply|write)\b",
         4,
     ),
+    _r(
+        "reply_help",
+        r"\b(help me|how should i|what should i|can you help me)\b.{0,20}\b(reply|respond|answer)\b|\b(reply|response) (suggestions?|options?|ideas?)\b",
+        4,
+    ),
     _r("draft", r"\b(draft|write|compose|suggest)\b.{0,20}\b(reply|response|message|text|dm)\b", 4),
+    _r(
+        "summary",
+        r"\b(summari[sz]e|summary|catch me up)\b.{0,30}\b(conversation|chat|messages?|thread)\b",
+        4,
+    ),
     _r(
         "platforms",
         r"\b(instagram|telegram|bumble|grindr|dm|direct message|chat|conversation)\b",
@@ -150,19 +160,40 @@ UNSUPPORTED = [
 
 SUBTYPES: dict[Intent, list[tuple[str, re.Pattern[str]]]] = {
     Intent.FINANCE: [
-        ("statements", re.compile(r"\bstatement\b", re.I)),
-        ("budgets", re.compile(r"\bbudget\b", re.I)),
+        (
+            "statements",
+            re.compile(r"\b(statement|pending review|review (my )?transactions)\b", re.I),
+        ),
+        ("loans", re.compile(r"\b(loans?|emi|emis|mortgage)\b", re.I)),
+        ("cards", re.compile(r"\b(credit card|utili[sz]ation|card limit)\b", re.I)),
+        ("budgets", re.compile(r"\bbudgets?\b", re.I)),
         ("subscriptions", re.compile(r"\bsubscriptions?\b", re.I)),
-        ("transactions", re.compile(r"\b(transactions?|spent|spending|expenses?)\b", re.I)),
+        (
+            "transactions",
+            re.compile(r"\b(transactions?|spent|spending|expenses?|cash ?flow)\b", re.I),
+        ),
     ],
     Intent.MESSAGING: [
         ("reply_assist", re.compile(r"\b(reply|respond|draft|say)\b", re.I)),
         ("conversation_summary", re.compile(r"\b(summari[sz]e|summary|catch me up)\b", re.I)),
     ],
     Intent.COACHING: [
-        ("briefing", re.compile(r"\b(briefing|review)\b", re.I)),
-        ("goals", re.compile(r"\bgoals?\b", re.I)),
+        (
+            "review",
+            re.compile(
+                r"\b(evening review|weekly review|review my (day|week)|how did i do|daily review)\b",
+                re.I,
+            ),
+        ),
+        ("briefing", re.compile(r"\b(briefing|morning)\b", re.I)),
+        (
+            "planning",
+            re.compile(
+                r"\b(plan|schedule)\b.{0,20}\b(day|week|morning|evening|tomorrow|today)\b", re.I
+            ),
+        ),
         ("habits", re.compile(r"\b(habits?|streak|routine)\b", re.I)),
+        ("goals", re.compile(r"\bgoals?\b", re.I)),
         ("planning", re.compile(r"\b(plan|schedule|tasks?|to-?do)\b", re.I)),
     ],
 }

@@ -27,6 +27,9 @@ class RunRequest(BaseModel):
         extra="forbid"
     )  # no user_id / agent_id / model / workflow fields exist
     message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    conversation_id: uuid.UUID | None = (
+        None  # optional: which imported conversation a messaging request is about
+    )
 
 
 class RunSummary(BaseModel):
@@ -97,7 +100,10 @@ async def run(
     orch = _orch(request)
     try:
         return await orch.run_user_request(
-            principal.user_id, body.message, idempotency_key=idempotency_key
+            principal.user_id,
+            body.message,
+            idempotency_key=idempotency_key,
+            conversation_id=body.conversation_id,
         )
     except RunFailed as exc:
         return JSONResponse(

@@ -7,15 +7,15 @@ user, and never take a user id from the client.
 
 import base64
 import binascii
-import uuid
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from domain.common.crypto import FieldCipher
+from domain.common.jsonable import jsonable
+
+__all__ = ["CipherDep", "decode_b64", "error_response", "get_cipher", "jsonable"]
 
 
 def get_cipher(request: Request) -> FieldCipher:
@@ -45,20 +45,3 @@ def decode_b64(content: str, limit: int) -> bytes:
     if len(data) > limit:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "file too large")
     return data
-
-
-def jsonable(v: Any) -> Any:
-    """JSON-safe copy. Money (Decimal) becomes an exact STRING - never a float - so no digit is ever lost."""
-    if isinstance(v, Decimal):
-        return str(v)
-    if isinstance(v, uuid.UUID):
-        return str(v)
-    if isinstance(v, datetime | date):
-        return v.isoformat()
-    if isinstance(v, dict):
-        return {str(k): jsonable(x) for k, x in v.items()}
-    if isinstance(v, list | tuple | set | frozenset):
-        return [jsonable(x) for x in v]
-    if hasattr(v, "__dataclass_fields__"):
-        return jsonable(vars(v))
-    return v

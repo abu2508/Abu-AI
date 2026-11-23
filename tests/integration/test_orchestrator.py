@@ -12,6 +12,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import func, select, text, update
 
+from agents.tools import AGENT_TOOLS, SPECS
+from agents.workflows import domain_tool_registry
 from core.agent_registry import service as agents
 from core.audit.service import ADMIN
 from core.governance import killswitch
@@ -32,7 +34,13 @@ from database.schemas import (
 )
 from database.seed.registry import seed_registry
 from tests.integration.conftest import Api
-from tests.integration.helpers import HASH, Device, enroll_device, make_user
+from tests.integration.helpers import (
+    HASH,
+    Device,
+    bootstrap_domain_agents,
+    enroll_device,
+    make_user,
+)
 
 IDEM = "idem-key-000000000001"
 
@@ -65,7 +73,7 @@ async def booted(api: Api) -> Api:
 async def seed_registry_and_bootstrap(api: Api, **kw: object) -> None:
     async with api.sessions() as s, s.begin():
         await seed_registry(s)
-        await bootstrap_mock_agents(s, ADMIN, **kw)
+        await bootstrap_domain_agents(s, **kw)
 
 
 async def run(api: Api, device: Device, message: str, key: str | None = None, **extra: object):
@@ -91,7 +99,7 @@ async def device_for(api: Api, name: str = "Abu") -> Device:
             "How much did I spend on food in my budget this month?",
             "finance",
             "finance_agent",
-            "finance.assistant.mock",
+            "finance.budgets",
         ),
         (
             "Help me reply to his Instagram message",
@@ -458,6 +466,10 @@ async def test_per_run_token_limit(booted: Api) -> None:
             __import__("database.schemas", fromlist=["MemoryMode"]).MemoryMode.READ_WRITE,
             ADMIN,
         )
+        for tool in AGENT_TOOLS["daily_coach_agent"]:
+            await agents.grant_tool(
+                s, "daily_coach_agent", v.version, tool, domain_tool_registry(), False, ADMIN
+            )
         await agents.activate_version(s, "daily_coach_agent", v.version, ADMIN)
     r = await run(booted, dev, "Plan my day around my goals")
     assert r.status_code == 429 and r.json()["error"]["code"] == "limit_exceeded"
@@ -596,6 +608,10 @@ async def test_user_memory_only_when_explicitly_granted(api: Api) -> None:
             s, "daily_coach_agent", v.version, "daily_coach_agent", MemoryMode.READ_WRITE, ADMIN
         )
         await agents.grant_memory(s, "daily_coach_agent", v.version, "user", MemoryMode.READ, ADMIN)
+        for tool in AGENT_TOOLS["daily_coach_agent"]:
+            await agents.grant_tool(
+                s, "daily_coach_agent", v.version, tool, domain_tool_registry(), False, ADMIN
+            )
         await agents.activate_version(s, "daily_coach_agent", v.version, ADMIN)
     assert (await run(api, dev, "Plan my day around my goals")).json()["context"]["items"] >= 1
 
@@ -763,7 +779,7 @@ async def test_execution_records_history_and_status(booted: Api) -> None:
             .scalars()
             .all()
         )
-        assert len(ev) == 2 and "budget" not in json.dumps([e.detail for e in ev])
+        assert len(ev) == 2 and "spend" not in json.dumps([e.detail for e in ev])
     hist = (await booted.client.get("/v1/orchestrator/runs", headers=a.headers)).json()
     assert [h["run_id"] for h in hist] == [r["run_id"]] and hist[0]["outcome"] == "completed"
     detail = (
@@ -775,7 +791,7 @@ async def test_execution_records_history_and_status(booted: Api) -> None:
     ).status_code == 404
     wf = (await booted.client.get("/v1/orchestrator/workflows", headers=a.headers)).json()
     assert {w["name"] for w in wf} >= {"finance.assistant.mock"} and all(
-        w["mock"] and w["tool_allowlist"] == [] for w in wf
+        w["mock"] and all(t in SPECS for t in w["tool_allowlist"]) for w in wf
     )
 
 
