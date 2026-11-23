@@ -85,10 +85,18 @@ services:
       target: runtime
     entrypoint: ["python", "-m", "services.admin"]
     restart: "no"
+    # Runs as the owner of secrets/memory-keyring.json (a private, mode-600 file): see gen-secrets.sh.
+    user: "${ABU_UID:-10001}"
     environment:
       ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
       ABU_JWT_SECRET: ${JWT_SECRET:?set in .env}
       ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
+      ABU_MEMORY_KEYRING_FILE: /run/secrets/memory_keyring
+      # Docker secret mounts are readable inside the container; access is controlled on the host.
+      ABU_MEMORY_KEYRING_STRICT_PERMISSIONS: "false"
+      ABU_EMBEDDER: local-test-hash
+      ABU_ALLOW_TEST_EMBEDDER_IN_PRODUCTION: ${ALLOW_TEST_EMBEDDER_IN_PRODUCTION:-false}
+    secrets: [memory_keyring]
     depends_on:
       db:
         condition: service_healthy
@@ -100,6 +108,7 @@ services:
       dockerfile: services/api/Dockerfile
       target: runtime
     restart: unless-stopped
+    user: "${ABU_UID:-10001}"  # owner of the private keyring file (see gen-secrets.sh); never root
     environment:
       ABU_ENV: ${ABU_ENV:-development}
       ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
@@ -109,6 +118,12 @@ services:
       ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
       # Set to 1 only when Caddy (one trusted proxy hop) fronts the API.
       ABU_TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+      ABU_MEMORY_KEYRING_FILE: /run/secrets/memory_keyring
+      # Docker secret mounts are readable inside the container; access is controlled on the host.
+      ABU_MEMORY_KEYRING_STRICT_PERMISSIONS: "false"
+      ABU_EMBEDDER: local-test-hash
+      ABU_ALLOW_TEST_EMBEDDER_IN_PRODUCTION: ${ALLOW_TEST_EMBEDDER_IN_PRODUCTION:-false}
+    secrets: [memory_keyring]
     ports:
       # Loopback only. Public access goes through Caddy (Milestone 9).
       - "127.0.0.1:8000:8000"
@@ -123,6 +138,12 @@ services:
 
 volumes:
   pgdata:
+
+secrets:
+  # Master-key material for memory encryption. A FILE on the host (created by gen-secrets.sh, mode 600,
+  # git-ignored): never in PostgreSQL, never in the image, never in an environment variable.
+  memory_keyring:
+    file: ../secrets/memory-keyring.json
 
 networks:
   # internal: containers on this network have no route to the internet.

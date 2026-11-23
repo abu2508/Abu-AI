@@ -35,7 +35,8 @@ GOVERNANCE = {
     "execution_calls",
     "spend_ledger",
 }
-HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE
+MEMORY = {"memory_records", "memory_embeddings", "memory_access_logs", "agent_threads"}
+HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY
 
 
 def tables(url: URL) -> set[str]:
@@ -83,7 +84,9 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
     assert tables(url) == REGISTRY | AGENTS_0002 | AUTH
     command.upgrade(cfg, "0004")
     assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD
-    command.upgrade(cfg, "head")  # 0005: governance
+    command.upgrade(cfg, "0005")  # governance
+    assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE
+    command.upgrade(cfg, "head")  # 0006: memory
     assert tables(url) == HEAD
     with eng.connect() as c:
         assert c.execute(text("SELECT count(*) FROM model_provider_policies")).scalar_one() == 1
@@ -101,6 +104,11 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
             is True
         )
 
+    command.downgrade(
+        cfg, "0005"
+    )  # drops the memory tables (no checkpoint data exists, so RESTRICT is satisfied)
+    assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE
+    command.upgrade(cfg, "head")
     command.downgrade(cfg, "0004")  # drops governance tables and the refresh-retry columns
     assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD
     command.upgrade(cfg, "head")
@@ -191,4 +199,79 @@ def test_governance_singletons_are_seeded_safe_by_default(scratch_db: Callable[[
             False,
             None,
         )  # default spend: INR 0
+    eng.dispose()
+
+
+def test_memory_migration_sets_up_pgvector_checkpoint_schema_and_guards(
+    scratch_db: Callable[[], URL],
+) -> None:
+    url = scratch_db()
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "head")
+    eng = create_engine(url)
+    with eng.connect() as c:
+        assert (
+            c.execute(
+                text("SELECT count(*) FROM pg_extension WHERE extname = 'vector'")
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            c.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.schemata WHERE schema_name = 'lg_checkpoints'"
+                )
+            ).scalar_one()
+            == 1
+        )
+        # nothing from LangGraph (or anything else) is created by the migration inside that schema:
+        assert (
+            c.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'lg_checkpoints'"
+                )
+            ).scalar_one()
+            == 0
+        )
+        dim = c.execute(
+            text(
+                "SELECT a.atttypmod FROM pg_attribute a JOIN pg_class t ON t.oid = a.attrelid WHERE t.relname = 'memory_embeddings' AND a.attname = 'embedding'"
+            )
+        ).scalar_one()
+        assert dim == 256  # the dimension is fixed by the migration; changing it needs a new one
+        index = c.execute(
+            text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_memory_embeddings_hnsw'")
+        ).scalar_one()
+        assert "hnsw" in index and "vector_cosine_ops" in index
+        checks = {
+            r[0]
+            for r in c.execute(
+                text(
+                    "SELECT conname FROM pg_constraint WHERE conrelid = 'memory_records'::regclass AND contype = 'c'"
+                )
+            )
+        }
+        assert {
+            "ck_memory_records_no_third_party_procedural",
+            "ck_memory_records_structured_not_embedded",
+            "ck_memory_records_third_party_embedding_needs_confirmation",
+        } <= checks
+
+    # LangGraph's own tables hold working memory. The downgrade must REFUSE rather than destroy them.
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE lg_checkpoints.checkpoints (thread_id text)"))
+    with pytest.raises(Exception, match="lg_checkpoints|depend"):
+        command.downgrade(cfg, "0005")
+    with eng.begin() as c:
+        c.execute(text("DROP TABLE lg_checkpoints.checkpoints"))
+    command.downgrade(cfg, "0005")  # after the operator has deleted the threads it succeeds
+    with eng.connect() as c:
+        assert (
+            c.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.schemata WHERE schema_name = 'lg_checkpoints'"
+                )
+            ).scalar_one()
+            == 0
+        )
     eng.dispose()

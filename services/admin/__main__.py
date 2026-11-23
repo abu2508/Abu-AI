@@ -18,6 +18,12 @@ the server and database credentials, which no enrolled device ever holds.
   python -m services.admin spend unfreeze --reason "..."
   python -m services.admin spend resolve <ledger-id> (--confirmed-inr 1.25 | --not-charged)
   python -m services.admin executions list [--limit 20]
+  python -m services.admin memory stats
+  python -m services.admin memory purge-expired            (retention: proposals, third-party summaries, threads...)
+  python -m services.admin memory add-key --file KEYRING --id k2   (HOST command: adds+activates a new master key)
+  python -m services.admin memory rotate-keys              (re-wraps every data key under the active master key)
+  python -m services.admin memory reembed                  (explicit re-embed with the configured embedder)
+  python -m services.admin memory erase-user --user ID --confirm ID    (right to erasure; irreversible)
 """
 
 import argparse
@@ -34,6 +40,9 @@ from core.audit.service import ADMIN
 from core.governance import killswitch, spending
 from core.governance.errors import GovernanceError
 from core.governance.service import Governance
+from core.memory.crypto import KeyRing
+from core.memory.runtime import open_runtime
+from core.memory.types import Caller
 from core.model_registry.errors import RegistryError
 from core.permissions.errors import PermissionDeniedError
 from core.permissions.tools import DEFAULT_TOOLS
@@ -168,6 +177,57 @@ async def executions_cmd(s: AsyncSession, _: Settings, a: argparse.Namespace) ->
         )
 
 
+async def memory_cmd(_: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
+    runtime = await open_runtime(cfg)
+    try:
+        async with a.factory() as s, s.begin():
+            svc = runtime.service(s, Governance(a.factory))
+            if a.action == "stats":
+                print(await svc.stats())
+            elif a.action == "purge-expired":
+                print("purged:", await svc.purge_expired())
+            elif a.action == "rotate-keys":
+                total = 0
+                while (n := await svc.rewrap_batch()) > 0:
+                    total += n
+                print(
+                    f"re-wrapped {total} record(s) under key {runtime.envelope._p.active_key_id!r}"
+                )  # noqa: SLF001
+            elif a.action == "reembed":
+                print("re-embedded:", await svc.reembed_all(), "with", runtime.embedder.id)
+            elif a.action == "erase-user":
+                if a.confirm != a.user:
+                    raise ValueError("--confirm must repeat the user id exactly")
+                r = await svc.erase_user(Caller.admin(uuid.UUID(a.user)))
+                print(
+                    f"erased: records={r.records} embeddings={r.embeddings} threads={r.threads} access_logs={r.access_log_rows_scrubbed}"
+                )
+    finally:
+        await runtime.close()
+
+
+def memory_add_key(a: argparse.Namespace) -> None:
+    """Host-side: edit the keyring FILE (never touches the database)."""
+    import json
+    import os
+
+    ring = KeyRing.from_file(a.file).rotated(a.id)
+    import base64
+
+    data = {
+        "active": ring.active_id,
+        "keys": {k: base64.b64encode(v).decode() for k, v in ring.keys.items()},
+    }
+    tmp = f"{a.file}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        json.dump(data, fh)
+    os.replace(tmp, a.file)
+    print(
+        f"added and activated key {a.id!r}; old keys are kept so existing data stays readable. Now run: memory rotate-keys"
+    )
+
+
 def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     p = argparse.ArgumentParser(
         prog="services.admin", description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -225,6 +285,15 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     grp = rv.add_mutually_exclusive_group(required=True)
     grp.add_argument("--confirmed-inr")
     grp.add_argument("--not-charged", action="store_true")
+    mem = add("memory", memory_cmd)
+    mem.add_argument(
+        "action",
+        choices=["stats", "purge-expired", "rotate-keys", "reembed", "erase-user", "add-key"],
+    )
+    mem.add_argument("--user")
+    mem.add_argument("--confirm")
+    mem.add_argument("--file")
+    mem.add_argument("--id")
     ex = add("executions", executions_cmd)
     ex.add_argument("action", choices=["list"])
     ex.add_argument("--limit", type=int, default=20)
@@ -236,6 +305,11 @@ async def run(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.cmd in ("version",) and args.action != "create" and args.number is None:
         parser.error("version number required")
+    if args.cmd == "memory" and args.action == "add-key":
+        if not (args.file and args.id):
+            parser.error("--file and --id are required")
+        memory_add_key(args)  # host-side: needs no database or app secrets
+        return
     settings = get_settings()
     settings.require_auth_secrets()
     engine = create_engine(settings)

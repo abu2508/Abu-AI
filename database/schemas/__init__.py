@@ -18,6 +18,13 @@ from database.schemas.governance import (
     SpendingConfig,
     SpendLedger,
 )
+from database.schemas.memory import (
+    EMBEDDING_DIM,
+    AgentThread,
+    MemoryAccessLog,
+    MemoryEmbedding,
+    MemoryRecord,
+)
 from database.schemas.registry import (
     ApprovalStatus,
     DataClass,
@@ -30,6 +37,11 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "EMBEDDING_DIM",
+    "AgentThread",
+    "MemoryAccessLog",
+    "MemoryEmbedding",
+    "MemoryRecord",
     "ABSOLUTE_MONTHLY_CEILING_INR",
     "Execution",
     "ExecutionCall",

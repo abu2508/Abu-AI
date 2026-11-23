@@ -120,3 +120,91 @@ def test_source_has_no_embedded_secrets_or_master_key() -> None:
 def test_api_image_does_not_advertise_server_software() -> None:
     dockerfile = (ROOT / "services/api/Dockerfile").read_text()
     assert "--no-server-header" in dockerfile and "--factory" in dockerfile
+
+
+def test_memory_keys_are_a_docker_secret_file_never_an_env_value_and_never_in_the_database() -> (
+    None
+):
+    api = COMPOSE["services"]["api"]
+    assert api["secrets"] == ["memory_keyring"] and COMPOSE["services"]["admin"]["secrets"] == [
+        "memory_keyring"
+    ]
+    assert COMPOSE["secrets"]["memory_keyring"]["file"] == "../secrets/memory-keyring.json"
+    env = api["environment"]
+    assert env["ABU_MEMORY_KEYRING_FILE"] == "/run/secrets/memory_keyring"
+    assert "ABU_MEMORY_KEK" not in env  # no raw key in an environment variable
+    assert (
+        "memory" not in str(COMPOSE["services"]["db"]["environment"]).lower()
+    )  # the database never receives key material
+
+
+def test_keyring_and_backup_keys_are_git_ignored() -> None:
+    for path in ("secrets/memory-keyring.json", "backups/db.dump.enc", "x.key"):
+        res = subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT, check=False)  # noqa: S603, S607
+        assert res.returncode == 0, path
+
+
+def test_embedder_defaults_are_the_local_test_embedder_and_production_use_is_gated() -> None:
+    env = COMPOSE["services"]["api"]["environment"]
+    assert env["ABU_EMBEDDER"] == "local-test-hash"
+    assert env["ABU_ALLOW_TEST_EMBEDDER_IN_PRODUCTION"].endswith(
+        ":-false}"
+    )  # opt-in, default false
+    assert (
+        "false"
+        in (ROOT / ".env.example")
+        .read_text()
+        .split("ALLOW_TEST_EMBEDDER_IN_PRODUCTION=")[1]
+        .split()[0]
+    )
+
+
+def test_no_memory_column_can_hold_plaintext_content_or_key_material() -> None:
+    from database.schemas import Base
+
+    for table in ("memory_records", "memory_embeddings", "memory_access_logs", "agent_threads"):
+        cols = {c.name for c in Base.metadata.tables[table].columns}
+        assert not (
+            cols
+            & {
+                "text",
+                "content",
+                "plaintext",
+                "body",
+                "message",
+                "prompt",
+                "kek",
+                "key_material",
+                "secret",
+            }
+        ), (table, cols)
+    rec = Base.metadata.tables["memory_records"]
+    assert (
+        str(rec.c.content_enc.type).upper().startswith("BYTEA")
+        or "LargeBinary" in type(rec.c.content_enc.type).__name__
+    )
+
+
+def test_encryption_at_rest_tooling_exists_and_is_honest() -> None:
+    script = (ROOT / "infrastructure/scripts/verify-encryption-at-rest.sh").read_text()
+    assert (
+        "NOT VERIFIED" in script and "ENCRYPTED" in script
+    )  # can fail; never reports success without evidence
+    assert (
+        subprocess.run(
+            ["bash", "-n", str(ROOT / "infrastructure/scripts/verify-encryption-at-rest.sh")],
+            check=False,
+        ).returncode
+        == 0
+    )  # noqa: S603, S607
+    assert (ROOT / "infrastructure/scripts/encrypted_backup.py").exists()
+
+
+def test_api_and_admin_never_run_as_root_and_can_read_only_their_own_key_file() -> None:
+    for svc in ("api", "admin"):
+        user = COMPOSE["services"][svc]["user"]
+        assert (
+            user.endswith(":-10001}") and user.strip("${}").split(":-")[-1] != "0"
+        )  # default is a non-root uid
+    script = (ROOT / "infrastructure/scripts/gen-secrets.sh").read_text()
+    assert "chmod 600 secrets/memory-keyring.json" in script and "ABU_UID" in script

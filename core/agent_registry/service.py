@@ -352,7 +352,10 @@ async def grant_tool(
 def validate_namespace(agent_id: str, namespace: str) -> None:
     if len(namespace) > 128 or not NAMESPACE.match(namespace) or ".." in namespace:
         raise ValueError(f"invalid memory namespace {namespace!r}")
-    if namespace.split("/", 1)[0] != agent_id:
+    if namespace.split("/", 1)[0] not in (
+        agent_id,
+        "user",
+    ):  # "user/..." = user-level memory, explicit grant
         raise PermissionDeniedError(
             f"namespace {namespace!r} does not belong to agent {agent_id!r}: cross-agent memory access is not allowed"
         )

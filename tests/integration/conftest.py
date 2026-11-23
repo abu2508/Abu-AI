@@ -1,4 +1,4 @@
-"""Integration fixtures: a throwaway database per test, built by the REAL Alembic migrations.
+"""Integration fixtures: a throwaway database per test (pgvector created by an admin), built by the REAL Alembic migrations.
 
 Needs ABU_TEST_ADMIN_URL: a sync-driver URL with CREATEDB rights, e.g.
 postgresql+psycopg://abu_admin:***@127.0.0.1:5432/postgres  (see README).
@@ -19,9 +19,13 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.governance.service import Governance
+from core.memory.checkpoint import open_checkpointer
+from core.memory.crypto import Envelope, KeyRing, LocalKeyProvider
+from core.memory.service import MemoryService
+from core.memory.threads import ThreadService
 from services.api.config import Settings
 from services.api.main import create_app
-from tests.integration.helpers import Device, enroll_device, make_settings, make_user
+from tests.integration.helpers import Device, SpyEmbedder, enroll_device, make_settings, make_user
 
 ADMIN_URL = os.environ.get("ABU_TEST_ADMIN_URL")
 
@@ -46,7 +50,13 @@ def scratch_db() -> Iterator[Callable[[], URL]]:
         with admin.connect() as c:
             c.execute(text(f'CREATE DATABASE "{name}"'))
         created.append(name)
-        return make_url(ADMIN_URL).set(database=name)
+        url = make_url(ADMIN_URL).set(database=name)
+        # pgvector is not a "trusted" extension: an administrator creates it, as init-db does for the real DB.
+        db = create_engine(url, isolation_level="AUTOCOMMIT")
+        with db.connect() as c:
+            c.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        db.dispose()
+        return url
 
     yield make
     with admin.connect() as c:
@@ -102,3 +112,61 @@ async def api(migrated_url: URL, sessions: async_sessionmaker[AsyncSession]) -> 
 async def device(api: Api) -> Device:
     uid = await make_user(api.sessions)
     return await enroll_device(api.sessions, api.settings, api.client, uid)
+
+
+# --- memory fixtures -----------------------------------------------------------------------------------------
+
+TEST_KEK = (
+    b"m" * 32
+)  # equals the key in make_settings(): API-created and test-created data interoperate
+
+
+@pytest.fixture
+def envelope() -> Envelope:
+    return Envelope(LocalKeyProvider(KeyRing("env-1", {"env-1": TEST_KEK})))
+
+
+@pytest.fixture
+def embedder() -> SpyEmbedder:
+    return SpyEmbedder()
+
+
+@pytest.fixture
+async def two_users(session: AsyncSession) -> tuple[uuid.UUID, uuid.UUID]:
+    from database.schemas import User
+
+    a, b = User(display_name="Alice"), User(display_name="Bob")
+    session.add_all([a, b])
+    await session.commit()
+    return a.id, b.id
+
+
+def build_service(
+    session: AsyncSession, envelope: Envelope, embedder: SpyEmbedder, gov: Governance, **kw: object
+) -> MemoryService:
+    return MemoryService(session, envelope, embedder, gov, **kw)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+async def mem(
+    session: AsyncSession, envelope: Envelope, embedder: SpyEmbedder, gov: Governance
+) -> MemoryService:
+    return build_service(session, envelope, embedder, gov)
+
+
+@pytest.fixture
+async def saver(migrated_url: URL, envelope: Envelope) -> AsyncIterator[object]:
+    """The real encrypted LangGraph checkpointer on the scratch database (schema lg_checkpoints)."""
+    pool, saver = await open_checkpointer(
+        migrated_url.render_as_string(hide_password=False), envelope
+    )
+    yield saver
+    await pool.close()
+
+
+@pytest.fixture
+async def mem_t(
+    session: AsyncSession, envelope: Envelope, embedder: SpyEmbedder, gov: Governance, saver: object
+) -> MemoryService:
+    """MemoryService wired to the real checkpointer, so deletion can purge checkpoint history."""
+    return build_service(session, envelope, embedder, gov, threads=ThreadService(session, saver))

@@ -14,6 +14,10 @@ dependencies = [
     "psycopg[binary]>=3.2,<4",
     "alembic>=1.14,<2",
     "pyjwt>=2.10,<3",
+    "langgraph>=1.2,<2",
+    "langgraph-checkpoint-postgres>=3.2,<4",
+    "pgvector>=0.5,<1",
+    "cryptography>=46,<51",
 ]
 
 [dependency-groups]
@@ -39,7 +43,7 @@ select = ["E", "F", "I", "UP", "B", "S", "ASYNC", "SIM"]
 ignore = ["E501"]  # line length is handled by ruff format
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S608"]
+"tests/**" = ["S101", "S603", "S607", "S608"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

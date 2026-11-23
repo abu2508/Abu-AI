@@ -54,7 +54,7 @@ def test_roundtrip() -> None:
         sign({k: v for k, v in good_claims().items() if k != "sid"}),  # missing claim
         sign({k: v for k, v in good_claims().items() if k != "exp"}),  # no expiry
         sign(good_claims(sub="not-a-uuid")),
-        jwt.encode(good_claims(), key=None, algorithm="none"),  # alg=none
+        jwt.encode(good_claims(), key="", algorithm="none"),  # alg=none
         sign(good_claims(), alg="HS512"),  # algorithm other than the pinned one
     ],
 )

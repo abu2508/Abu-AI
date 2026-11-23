@@ -1,3 +1,4 @@
+import base64
 import uuid
 from dataclasses import dataclass
 
@@ -10,12 +11,13 @@ from core.agent_registry import service as agents
 from core.audit.service import ADMIN
 from core.governance.service import Governance
 from core.permissions.runtime import RunContext, start_run
-from database.schemas import User
+from database.schemas import MemoryMode, User
 from database.seed.registry import MOCK_ALIAS, seed_registry
 from services.api.auth import service as auth
 from services.api.config import Settings
 
 JWT = SecretStr("j" * 48)
+MEMORY_KEK = SecretStr(base64.b64encode(b"m" * 32).decode())
 HASH = SecretStr("h" * 48)
 
 
@@ -25,6 +27,7 @@ def make_settings(url: URL | None = None, **overrides: object) -> Settings:
         "database_url": SecretStr(url.render_as_string(hide_password=False)) if url else None,
         "jwt_secret": JWT,
         "token_hash_key": HASH,
+        "memory_kek": MEMORY_KEK,
         "litellm_base_url": "http://127.0.0.1:9",
         "rate_limit_auth_per_minute": 1000,
         "rate_limit_ip_per_minute": 100000,
@@ -77,12 +80,15 @@ async def runnable_agent(
     user_id: uuid.UUID | None = None,
     task_type: str = "test",
     limits: agents.VersionLimits | None = None,
+    memory_grants: tuple[tuple[str, MemoryMode], ...] = (),
 ) -> RunContext:
     """Seeds, grants the aliases on the draft, activates, enables, and returns a RunContext.
     Commits first: execution records are written in their own transactions and must see the rows."""
     await seed_registry(session)
     for alias in aliases:
         await agents.grant_model_alias(session, agent_id, 1, alias)
+    for namespace, mode in memory_grants:
+        await agents.grant_memory(session, agent_id, 1, namespace, mode)
     if limits is not None:
         await agents.update_limits(session, agent_id, 1, limits)
     await agents.activate_version(session, agent_id, 1)
@@ -114,3 +120,61 @@ async def enable_paid(
     await spending.set_budget(gov.factory, ADMIN, Decimal(monthly), Decimal(daily))
     await spending.set_rate(gov.factory, ADMIN, Decimal(rate), source)
     await spending.set_paid_models_enabled(gov.factory, ADMIN, True)
+
+
+class SpyEmbedder:
+    """The deterministic test embedder, recording every text it is ever asked to embed."""
+
+    def __init__(self) -> None:
+        from core.memory.embeddings import LocalTestHashEmbedder
+
+        self._inner = LocalTestHashEmbedder()
+        self.id = self._inner.id
+        self.dim = self._inner.dim
+        self.is_semantic = self._inner.is_semantic
+        self.is_local = self._inner.is_local
+        self.max_data_class = self._inner.max_data_class
+        self.seen: list[str] = []
+
+    async def embed(self, texts):  # type: ignore[no-untyped-def]
+        self.seen.extend(texts)
+        return await self._inner.embed(texts)
+
+
+def _as_bytes(value: object) -> bytes:
+    import json
+
+    if value is None:
+        return b""
+    if isinstance(value, bytes | memoryview):
+        return bytes(value)
+    if isinstance(value, dict | list):
+        return json.dumps(value, default=str).encode()
+    return str(value).encode()
+
+
+def scan_database(url: URL, needles: dict[str, bytes]) -> dict[str, list[str]]:
+    """Where (schema.table.column) does each needle appear anywhere in the database? Compares RAW BYTES
+    over every row of every table in `public` and `lg_checkpoints` (a JSON-text scan would miss binary)."""
+    from sqlalchemy import create_engine, text
+
+    found: dict[str, list[str]] = {name: [] for name in needles}
+    engine = create_engine(url)
+    try:
+        with engine.connect() as c:
+            tables = c.execute(
+                text(
+                    "SELECT table_schema, table_name FROM information_schema.tables "
+                    "WHERE table_schema IN ('public', 'lg_checkpoints') AND table_type = 'BASE TABLE'"
+                )
+            ).all()
+            for schema, table in tables:
+                for row in c.execute(text(f'SELECT * FROM "{schema}"."{table}"')).mappings():
+                    for column, value in row.items():
+                        blob = _as_bytes(value)
+                        for name, needle in needles.items():
+                            if needle in blob:
+                                found[name].append(f"{schema}.{table}.{column}")
+    finally:
+        engine.dispose()
+    return found

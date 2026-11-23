@@ -41,6 +41,27 @@ class Settings(BaseSettings):
     rate_limit_ip_per_minute: int = Field(default=120, ge=1)
     rate_limit_user_per_minute: int = Field(default=300, ge=1)
 
+    # --- memory (Milestone 5) -------------------------------------------------------
+    # Master-key material for envelope encryption. It lives OUTSIDE PostgreSQL: either a JSON
+    # keyring file (preferred; mount it read-only, mode 600) or a single base64 key in the env
+    # (development). Never stored in the database, never in the repository.
+    memory_keyring_file: str | None = None
+    memory_kek: SecretStr | None = None
+    # Docker-secret mounts are world-readable inside the container (access is controlled on the host
+    # and by the mount), so compose sets this false. Keep it true for ordinary file paths.
+    memory_keyring_strict_permissions: bool = True
+    # Embeddings. Only the deterministic local TEST embedder exists. Any other provider is refused
+    # until explicitly approved (data policy, retention, training, pricing) - see core/memory/embeddings.py
+    embedder: str = "local-test-hash"
+    embedding_external_approved: bool = False
+    allow_test_embedder_in_production: bool = False
+    # Retention (days). 0 / None = keep until deleted.
+    retention_proposal_days: int = Field(default=2, ge=1, le=30)
+    retention_third_party_days: int = Field(default=90, ge=1, le=3650)
+    retention_episodic_days: int = Field(default=180, ge=1, le=3650)
+    retention_superseded_days: int = Field(default=30, ge=1, le=3650)
+    retention_thread_days: int = Field(default=7, ge=1, le=365)
+
     @field_validator("jwt_secret", "token_hash_key")
     @classmethod
     def _strong_secret(cls, v: SecretStr | None) -> SecretStr | None:

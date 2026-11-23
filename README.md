@@ -4,9 +4,9 @@
 **personal messaging assistant** and a **daily coach** — built to run on a single modest VPS with a
 hard AI API budget of ₹0–₹300 per month.
 
-> Status: **Milestone 4 — governance and cost control.** No real model has been called, no paid
-> provider is enabled (spend is INR 0), no sensitive data is sent anywhere, and there is no mobile
-> app yet. See the roadmap below.
+> Status: **Milestone 5 — hybrid memory.** No real model or embedding provider has been called, no
+> paid provider is enabled (spend is INR 0), no personal data leaves this deployment, and there is no
+> mobile app yet. See the roadmap below.
 
 ## Architecture (current)
 
@@ -256,6 +256,92 @@ revokes the session: no key, a different key, a second retry, after 30 s, or aft
 Someone holding only a stolen token lacks the key; someone who captured the whole request gets at most one
 replacement inside 30 s, and the real client's next refresh then trips reuse detection.
 
+## Hybrid memory (Milestone 5)
+
+| Kind | Where it lives |
+|---|---|
+| Working memory | LangGraph checkpoints, PostgreSQL schema `lg_checkpoints` (separate from long-term memory), 7-day default retention |
+| Episodic / semantic / procedural | `memory_records`, content always encrypted; 180 d / until deleted / until deleted |
+| Structured domain memory | `memory_records` with a registered, validated schema; exact lookup by `(namespace, key)` in SQL; **never embedded** |
+| Semantic retrieval | `memory_embeddings` (pgvector) over **approved, redacted summaries only** |
+
+PostgreSQL stays the source of truth. Exact financial/transactional questions use SQL, never vectors.
+
+### Namespaces and access
+`<agent_id>/…` is agent-specific; `user/…` is user-level memory that an agent can reach **only** if its active
+version was explicitly granted it. There is no way to grant one agent another agent's namespace. Every query is
+scoped by the authenticated user id (never by input); another user's ids look nonexistent. Agents get an
+`AgentMemory` handle bound to their `RunContext`: it exposes propose / read / search / context but **no**
+approve, reject, delete or erase. Agent-driven memory access stops under the kill switch; the owner's own access
+and deletion do not.
+
+### Writing memory: proposals are validated
+Anything an LLM proposes is validated (schema, size, control characters, namespace, grant) and the server never
+trusts a declared sensitivity downward (PII, financial/health words and `finance_agent/…` raise it). It then
+waits for the user when it is **sensitive, third-party, a procedural rule, a consequential structured change,
+instruction-like, or would replace a user-confirmed fact**. A confirmed fact is **never silently overwritten**:
+the replacement is a pending proposal; the old value stays active until the user approves (then it is kept
+encrypted for a 30-day undo window and removed from search). Hard DB `CHECK`s back this up: third-party text can
+never be procedural, structured data can never be embedded, unconfirmed third-party text can never be embedded.
+
+### Messaging privacy (built now, used by the Messaging Agent later)
+- **Raw third-party messages are never stored**, logged, embedded or put in audit. `raw_source` is used only to
+  reject near-verbatim copies and injection patterns, then discarded.
+- Only a **summary** can be proposed, in `<agent>/<platform>/<conversation_id>` (opaque ids, never display
+  names). It is a pending, encrypted proposal that **expires in 2 days** unless approved; approved summaries are
+  kept 90 days by default.
+- **Embeddings** come only from an `embed_text` that the user explicitly approved and that passed PII
+  redaction checks (e-mails, handles, URLs, IPs, long number runs). Never from raw messages. Regex redaction is
+  best-effort (it cannot find names); the human approval is the real control.
+- **Injection:** instruction-like text is flagged, forced to wait for the user, kept out of search until
+  reviewed, and always rendered as one JSON line of quoted data (`<`/`>` escaped) under a preface that says it is
+  data. Memory text can never change permissions or tools.
+
+### Encryption (application-level, envelope)
+Each record gets its own random data key (AES-256-GCM); that key is wrapped by a master key from a keyring
+**outside PostgreSQL** (`secrets/memory-keyring.json`, mode 600, mounted as a Docker secret, git-ignored). The
+database stores only ciphertext, nonce, wrapped key and the key *id*. Ciphertext is bound to its user, record and
+purpose, so copying a blob to another row fails. Rotate with `memory add-key` (host) + `memory rotate-keys`
+(re-wraps keys, content untouched); verified on the live stack with the old key removed. **Back the keyring up
+separately from database backups: losing it makes encrypted memory unrecoverable.**
+Checkpoints are encrypted too. LangGraph writes plain string/number state inline as plaintext JSON, bypassing any
+serializer cipher, so `EncryptedPostgresSaver` boxes those values into encrypted blobs and refuses to load
+unencrypted data. (Checkpoint ciphertext has a fixed context label, so it is authenticated but not bound to a
+row; `checkpoints.metadata` stays plaintext — never put content in config metadata.)
+
+### Embeddings
+Provider-independent interface; **only a deterministic local TEST embedder exists** (`local-test-hash`): it
+hashes words and word pairs, so it measures *lexical overlap, not meaning*, and results are labelled
+`lexical-test`. It is refused in production unless `ALLOW_TEST_EMBEDDER_IN_PRODUCTION=true`. Any other provider
+is refused until `embedding_external_approved` is set after you review its data policy, retention, training
+practices and pricing; none is registered. The vector dimension (256) is fixed by migration 0006; a different
+model/dimension needs a new migration and an explicit `memory reembed`. The app refuses to start on a mismatch.
+**Embeddings are sensitive and stored UNENCRYPTED**: encrypting the vector column would stop pgvector from
+computing distances. Mitigations: disk and backup encryption, per-user filtering, cascade deletion, access logs,
+and vectors are never returned by any API.
+
+### Deletion and retention
+Deleting a memory removes the record, derived summaries (`derived_from`), every older version, its embedding,
+scrubs the access-log references, and deletes **every historical checkpoint** of its source thread
+(`purge_sources`, default on). `POST /v1/memory/erase` / `memory erase-user` erase all memory, all threads and all
+memory access logs of a user. A receipt of counts (no content) goes to the audit log. Retention (`memory
+purge-expired`, an operator job; there is no scheduler yet): proposals 2 d, third-party summaries 90 d, episodic
+180 d, superseded 30 d, threads 7 d. Callers can only shorten retention.
+Deleted rows physically remain in PostgreSQL until vacuum, and in older backups until they rotate out.
+
+### Volume and backup encryption at rest
+- `infrastructure/scripts/encrypted_backup.py`: streaming AES-256-GCM backups (chunk index + final flag are
+  authenticated, so truncation, reordering and bit flips are detected; the key file stays off the database).
+  `pg_dump -Fc … | encrypted_backup.py encrypt --key-file K > db.enc`; restore by decrypting into `pg_restore`.
+- `infrastructure/scripts/verify-encryption-at-rest.sh` reports whether Docker's data volume sits on dm-crypt/LUKS.
+  **It reports NOT VERIFIED in this development sandbox, and will on any host without disk encryption.** Enable
+  provider volume encryption or LUKS on the VPS and re-run it before storing real personal data.
+
+### Memory API and CLI
+`/v1/memory` (list, create, edit, approve, reject, delete, namespace delete, erase, proposals, access-log,
+threads) is the user's Memory Manager. Operator: `memory stats | purge-expired | add-key | rotate-keys | reembed |
+erase-user`.
+
 ## Prerequisites
 
 Python ≥ 3.12 (tested on 3.13), [uv](https://docs.astral.sh/uv/), Docker with Compose v2.
@@ -288,7 +374,7 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm --n
 
 ```bash
 export ABU_DATABASE_URL="postgresql+psycopg://USER:PASS@127.0.0.1:5432/abu_ai"   # dev overlay port
-uv run alembic upgrade head   # 0001 registry · 0002 agents · 0003 auth+audit · 0004 agent versions · 0005 governance
+uv run alembic upgrade head   # 0001 registry · 0002 agents · 0003 auth+audit · 0004 agent versions · 0005 governance · 0006 memory
 uv run alembic downgrade base
 uv run alembic revision --autogenerate -m "describe change" --rev-id 0003
 ```
@@ -350,10 +436,27 @@ controller.
 2. ✅ Model Registry, Agent Registry foundations, provider abstraction, mock end-to-end flow
 3. ✅ Authentication and the Agent Registry (versions, permissions, limits, audit)
 4. ✅ Governance and cost control (INR 300/month ledger, kill switch, execution records)
-5. Memory · 6. Orchestrator · 7. Domain agents · 8. Mobile app · 9. Testing and deployment
+5. ✅ Hybrid memory (encrypted, isolated, deletable; local test embedder)
+6. Orchestrator · 7. Domain agents · 8. Mobile app · 9. Testing and deployment
 
 ## Known issues and limitations
 
+- **Memory — no production embedding model.** Search quality today is lexical (test embedder). A real
+  provider needs your approval of its data policy, retention, training and pricing first.
+- **Embeddings are unencrypted** (see above); a stolen database *without* disk/backup encryption would expose
+  them. Disk encryption is **not verified** here.
+- **Deletion is logical-then-physical:** rows persist until vacuum; old backups keep them until they expire.
+- **Redaction is regex, not NER**; it cannot detect names. The user's approval of `embed_text` is the control.
+- **Checkpoint metadata is plaintext**, and checkpoint ciphertext is not row-bound (LangGraph gives the cipher no
+  row context). The saver subclass overrides one protected library method; the library is pinned and
+  regression-tested.
+- **HNSW + per-user filtering** relies on pgvector >= 0.8 iterative scan (0.8.7 here); with older versions a
+  filtered search could return fewer rows than requested.
+- **No retention scheduler or job queue**; `memory purge-expired` must be run by the operator.
+- **Key custody:** the keyring is a file next to the application; anyone controlling the running app (or the
+  host) can read it. A KMS/HSM `KeyProvider` is a drop-in later.
+- Messaging tables (`people`, `conversations`, …) are not built; this milestone provides the privacy layer they
+  will use.
 - **No HTTP endpoint executes a model or tool.** The runtime is exercised at service level; the
   orchestrator (Milestone 6) will expose it. The tool registry is empty; approvals are enforced and
   tested but there is no approval-granting API yet.

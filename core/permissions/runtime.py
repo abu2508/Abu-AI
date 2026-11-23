@@ -116,9 +116,10 @@ class RunContext:
         return self.tools[name]
 
     def authorize_memory(self, namespace: str, *, write: bool = False) -> None:
-        # Cross-agent isolation holds even if a bad grant row existed: the first path segment
-        # must be this agent's own id.
-        if namespace_owner(namespace) != self.agent_id or ".." in namespace:
+        # Cross-agent isolation holds even if a bad grant row existed.
+        # Allowed roots: the agent's own id, or the user-level "user" root. The grant check below
+        # still decides - "user/..." is reachable ONLY where the version was explicitly granted it.
+        if namespace_owner(namespace) not in (self.agent_id, "user") or ".." in namespace:
             raise PermissionDeniedError("memory namespace belongs to another agent")
         for granted, mode in self.memory.items():
             if namespace == granted or namespace.startswith(granted + "/"):

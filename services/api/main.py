@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from services.api import agents, governance, health
+from core.memory.runtime import build_keyring, open_runtime, verify_embedding_dimension
+from services.api import agents, governance, health, memory
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine, create_sessionmaker
@@ -21,20 +22,29 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     settings = settings or get_settings()
     settings.require_auth_secrets()  # fail fast: never start without (distinct, strong) auth secrets
     limiter = limiter or RateLimiter()
+    if settings.database_url is not None:
+        build_keyring(settings)  # fail fast: no memory key material => no start
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = create_engine(settings)
         app.state.sessionmaker = create_sessionmaker(app.state.engine)
+        app.state.memory = None
         try:
+            if settings.database_url is not None and app.state.sessionmaker is not None:
+                app.state.memory = await open_runtime(settings)
+                async with app.state.sessionmaker() as s:
+                    await verify_embedding_dimension(s, app.state.memory.embedder)
             yield
         finally:
+            if app.state.memory is not None:
+                await app.state.memory.close()
             if app.state.engine is not None:
                 await app.state.engine.dispose()
 
     app = FastAPI(
         title="Abu AI",
-        version="0.4.0",
+        version="0.5.0",
         lifespan=lifespan,
         # Interactive docs are development-only.
         docs_url="/docs" if settings.docs_enabled else None,
@@ -45,10 +55,12 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.state.limiter = limiter
     app.state.engine = None
     app.state.sessionmaker = None
+    app.state.memory = None
     app.include_router(health.router)
     app.include_router(auth_routes.router)
     app.include_router(agents.router)
     app.include_router(governance.router)
+    app.include_router(memory.router)
 
     # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
     app.add_middleware(
