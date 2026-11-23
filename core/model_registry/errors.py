@@ -12,3 +12,7 @@ class DuplicateError(RegistryError):
 
 class ApprovalError(RegistryError):
     """A model or policy does not meet the conditions for the requested state change."""
+
+
+class VersionStateError(RegistryError):
+    """The operation is not allowed in the version's current lifecycle state."""

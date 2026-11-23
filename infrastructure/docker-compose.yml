@@ -73,6 +73,27 @@ services:
         condition: service_healthy
     networks: [data]
 
+  admin:
+    # Operator-only CLI (profile "admin": never started by `up`). Holds DB + token-hash access but
+    # publishes no ports and is not part of the app API: administration is separate from the
+    # credentials an app/device ever receives.
+    #   docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm admin --help
+    profiles: ["admin"]
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    entrypoint: ["python", "-m", "services.admin"]
+    restart: "no"
+    environment:
+      ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+      ABU_JWT_SECRET: ${JWT_SECRET:?set in .env}
+      ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+
   api:
     build:
       context: ..
@@ -84,6 +105,10 @@ services:
       ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
       ABU_LITELLM_BASE_URL: http://litellm:4000
       ABU_LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      ABU_JWT_SECRET: ${JWT_SECRET:?set in .env}
+      ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
+      # Set to 1 only when Caddy (one trusted proxy hop) fronts the API.
+      ABU_TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
     ports:
       # Loopback only. Public access goes through Caddy (Milestone 9).
       - "127.0.0.1:8000:8000"

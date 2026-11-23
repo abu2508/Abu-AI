@@ -1,7 +1,8 @@
 """Health endpoints.
 
-/health        liveness: process is up. No dependencies are touched.
-/health/ready  readiness: PostgreSQL reachable, pgvector installed, LiteLLM alive.
+/health        PUBLIC liveness: {"status": "ok"} and nothing else. No dependencies are touched.
+/health/ready  AUTHENTICATED readiness: PostgreSQL reachable, pgvector installed, LiteLLM alive.
+               Dependency names/status reveal infrastructure, so they are not public.
 
 Failure details are deliberately generic: no hostnames, URLs or credentials leak.
 """
@@ -10,11 +11,12 @@ import logging
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from services.api.auth.deps import get_principal
 from services.api.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ async def check_litellm(settings: Settings) -> CheckStatus:
         return "fail"
 
 
-@router.get("/health/ready", response_model=Readiness)
+@router.get("/health/ready", response_model=Readiness, dependencies=[Depends(get_principal)])
 async def ready(request: Request, response: Response) -> Readiness:
     settings: Settings = request.app.state.settings
     engine: AsyncEngine | None = request.app.state.engine

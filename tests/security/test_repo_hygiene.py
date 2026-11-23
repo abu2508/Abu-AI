@@ -72,8 +72,8 @@ def test_litellm_ui_stub_is_inert() -> None:
 def test_env_example_has_only_placeholders() -> None:
     text = (ROOT / ".env.example").read_text()
     for line in text.splitlines():
-        if re.match(r"^[A-Z_]*(PASSWORD|KEY)=", line):
-            assert line.endswith(("change-me", "sk-change-me")), line
+        if re.match(r"^[A-Z_]*(PASSWORD|KEY|SECRET)=", line):
+            assert "change-me" in line, line
 
 
 def test_env_file_is_gitignored() -> None:
@@ -83,3 +83,40 @@ def test_env_file_is_gitignored() -> None:
         check=False,
     )
     assert res.returncode == 0
+
+
+def test_admin_service_is_opt_in_unpublished_and_internal_only() -> None:
+    admin = COMPOSE["services"]["admin"]
+    assert admin["profiles"] == ["admin"]  # never started by a plain `up`
+    assert "ports" not in admin
+    assert admin["networks"] == ["data"]  # no internet route
+
+
+def test_auth_secrets_come_from_env_not_literals() -> None:
+    for svc in ("api", "admin"):
+        env = COMPOSE["services"][svc]["environment"]
+        for key in ("ABU_JWT_SECRET", "ABU_TOKEN_HASH_KEY"):
+            assert env[key].startswith("${") and "set in .env" in env[key], (svc, key)
+
+
+def test_mobile_facing_api_does_not_receive_admin_or_provider_credentials() -> None:
+    env = COMPOSE["services"]["api"]["environment"]
+    assert not [k for k in env if k.endswith("_API_KEY")]
+    assert "POSTGRES_ADMIN_PASSWORD" not in str(env)  # app uses its least-privilege DB role
+
+
+def test_trusted_proxy_hops_defaults_to_zero() -> None:
+    assert COMPOSE["services"]["api"]["environment"]["ABU_TRUSTED_PROXY_HOPS"].endswith(":-0}")
+
+
+def test_source_has_no_embedded_secrets_or_master_key() -> None:
+    pattern = re.compile(
+        r"(sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)"
+    )
+    for path in list((ROOT / "services").rglob("*.py")) + list((ROOT / "core").rglob("*.py")):
+        assert not pattern.search(path.read_text()), path
+
+
+def test_api_image_does_not_advertise_server_software() -> None:
+    dockerfile = (ROOT / "services/api/Dockerfile").read_text()
+    assert "--no-server-header" in dockerfile and "--factory" in dockerfile

@@ -18,7 +18,17 @@ REGISTRY = {
     "model_pricing",
     "model_routes",
 }
-AGENTS = {"agents", "agent_model_permissions"}
+AGENTS_0002 = {"agents", "agent_model_permissions"}
+AUTH = {"users", "auth_sessions", "refresh_tokens", "enrollment_codes", "audit_events"}
+AGENTS_HEAD = {
+    "agents",
+    "agent_versions",
+    "agent_version_model_aliases",
+    "agent_version_tools",
+    "agent_version_memory",
+    "tool_approvals",
+}
+HEAD = REGISTRY | AUTH | AGENTS_HEAD
 
 
 def tables(url: URL) -> set[str]:
@@ -32,7 +42,7 @@ def tables(url: URL) -> set[str]:
 def test_fresh_database_upgrade(scratch_db: Callable[[], URL]) -> None:
     url = scratch_db()
     command.upgrade(alembic_config(url), "head")
-    assert tables(url) == REGISTRY | AGENTS
+    assert tables(url) == HEAD
 
 
 def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[], URL]) -> None:
@@ -40,7 +50,6 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
     cfg = alembic_config(url)
     command.upgrade(cfg, "0001")
     assert tables(url) == REGISTRY
-
     eng = create_engine(url)
     with eng.begin() as c:
         c.execute(
@@ -49,16 +58,66 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
                 "human_review, max_data_class) VALUES ('p','r','no','no','synthetic')"
             )
         )
+    command.upgrade(cfg, "0002")
+    assert tables(url) == REGISTRY | AGENTS_0002
+    # Legacy (Milestone 2) agent-level permissions, which 0004 must carry over without widening.
+    with eng.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO agents (agent_id, name, description, enabled) VALUES ('legacy_agent','L','d',true)"
+            )
+        )
+        c.execute(
+            text("INSERT INTO agents (agent_id, name, description) VALUES ('idle_agent','I','d')")
+        )
+        c.execute(text("INSERT INTO agent_model_permissions VALUES ('legacy_agent','test-mock')"))
+
+    command.upgrade(cfg, "0003")
+    assert tables(url) == REGISTRY | AGENTS_0002 | AUTH
     command.upgrade(cfg, "head")
-    assert tables(url) == REGISTRY | AGENTS
+    assert tables(url) == HEAD
     with eng.connect() as c:
         assert c.execute(text("SELECT count(*) FROM model_provider_policies")).scalar_one() == 1
-    eng.dispose()
+        rows = c.execute(
+            text(
+                "SELECT v.agent_id, v.version, v.state, a.alias FROM agent_versions v "
+                "LEFT JOIN agent_version_model_aliases a ON a.version_id = v.id ORDER BY 1"
+            )
+        ).all()
+        assert rows == [
+            ("legacy_agent", 1, "active", "test-mock")
+        ]  # idle agent: no permissions, no version yet
+        assert (
+            c.execute(text("SELECT enabled FROM agents WHERE agent_id='legacy_agent'")).scalar_one()
+            is True
+        )
 
+    command.downgrade(cfg, "0003")  # restores the legacy permission table from the active version
+    with eng.connect() as c:
+        assert c.execute(
+            text("SELECT agent_id, route_alias FROM agent_model_permissions")
+        ).all() == [("legacy_agent", "test-mock")]
     command.downgrade(cfg, "base")
     assert tables(url) == set()
     command.upgrade(cfg, "head")  # and back up again
-    assert tables(url) == REGISTRY | AGENTS
+    assert tables(url) == HEAD
+    eng.dispose()
+
+
+def test_audit_trigger_removed_cleanly_on_downgrade(scratch_db: Callable[[], URL]) -> None:
+    url = scratch_db()
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "0002")
+    eng = create_engine(url)
+    with eng.connect() as c:
+        assert (
+            c.execute(
+                text("SELECT count(*) FROM pg_proc WHERE proname='audit_events_append_only'")
+            ).scalar_one()
+            == 0
+        )
+    eng.dispose()
 
 
 def test_upgrade_is_idempotent(scratch_db: Callable[[], URL]) -> None:

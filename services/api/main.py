@@ -1,21 +1,31 @@
-"""Abu AI API entrypoint."""
+"""Abu AI API entrypoint. Run with:  uvicorn --factory services.api.main:create_app"""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from services.api import health
+from services.api import agents, health
+from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
-from services.api.db import create_engine
+from services.api.db import create_engine, create_sessionmaker
+from services.api.middleware import (
+    BodySizeLimitMiddleware,
+    HardeningHeadersMiddleware,
+    RateLimitMiddleware,
+)
+from services.api.ratelimit import RateLimiter
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, limiter: RateLimiter | None = None) -> FastAPI:
     settings = settings or get_settings()
+    settings.require_auth_secrets()  # fail fast: never start without (distinct, strong) auth secrets
+    limiter = limiter or RateLimiter()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = create_engine(settings)
+        app.state.sessionmaker = create_sessionmaker(app.state.engine)
         try:
             yield
         finally:
@@ -24,7 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Abu AI",
-        version="0.1.0",
+        version="0.3.0",
         lifespan=lifespan,
         # Interactive docs are development-only.
         docs_url="/docs" if settings.docs_enabled else None,
@@ -32,9 +42,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
     app.state.settings = settings
+    app.state.limiter = limiter
     app.state.engine = None
+    app.state.sessionmaker = None
     app.include_router(health.router)
+    app.include_router(auth_routes.router)
+    app.include_router(agents.router)
+
+    # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
+    app.add_middleware(
+        RateLimitMiddleware,
+        limiter=limiter,
+        trusted_hops=settings.trusted_proxy_hops,
+        per_minute=settings.rate_limit_ip_per_minute,
+        auth_per_minute=settings.rate_limit_auth_per_minute,
+    )
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+    app.add_middleware(HardeningHeadersMiddleware)
     return app
-
-
-app = create_app()

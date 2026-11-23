@@ -16,14 +16,12 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 ADMIN_URL = os.environ.get("ABU_TEST_ADMIN_URL")
-needs_admin = pytest.mark.skipif(ADMIN_URL is None, reason="ABU_TEST_ADMIN_URL not set")
 
 
 def alembic_config(url: str | URL) -> Config:
     cfg = Config("alembic.ini")
-    cfg.set_main_option(
-        "sqlalchemy.url", make_url(url).render_as_string(hide_password=False).replace("%", "%%")
-    )
+    rendered = make_url(url).render_as_string(hide_password=False).replace("%", "%%")
+    cfg.set_main_option("sqlalchemy.url", rendered)
     return cfg
 
 
@@ -50,10 +48,20 @@ def scratch_db() -> Iterator[Callable[[], URL]]:
 
 
 @pytest.fixture
-async def session(scratch_db: Callable[[], URL]) -> AsyncIterator[AsyncSession]:
+def migrated_url(scratch_db: Callable[[], URL]) -> URL:
     url = scratch_db()
     command.upgrade(alembic_config(url), "head")
-    engine = create_async_engine(url)
-    async with async_sessionmaker(engine, expire_on_commit=False)() as s:
-        yield s
+    return url
+
+
+@pytest.fixture
+async def sessions(migrated_url: URL) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    engine = create_async_engine(migrated_url)
+    yield async_sessionmaker(engine, expire_on_commit=False)
     await engine.dispose()
+
+
+@pytest.fixture
+async def session(sessions: async_sessionmaker[AsyncSession]) -> AsyncIterator[AsyncSession]:
+    async with sessions() as s:
+        yield s

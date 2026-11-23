@@ -22,11 +22,10 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.schemas.base import Base
+from database.schemas.columns import created_at_col, enum_col, uuid_pk
 
 
 class DataClass(enum.IntEnum):
@@ -49,47 +48,22 @@ class ApprovalStatus(enum.StrEnum):
     REJECTED = "rejected"
 
 
-def _enum(e: type[enum.Enum], name: str) -> SAEnum:
-    """Store enums as VARCHAR + CHECK (simple to migrate, unlike native PG enums)."""
-    return SAEnum(
-        e,
-        name=name,
-        native_enum=False,
-        create_constraint=True,
-        values_callable=lambda x: [m.name.lower() for m in x],
-        length=32,
-    )
-
-
-def _uuid_pk() -> Mapped[uuid.UUID]:
-    return mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
-    )
-
-
-def _created_at() -> Mapped[datetime]:
-    return mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
 class ProviderPolicy(Base):
     __tablename__ = "model_provider_policies"
 
-    id: Mapped[uuid.UUID] = _uuid_pk()
+    id: Mapped[uuid.UUID] = uuid_pk()
     provider: Mapped[str] = mapped_column(String(64), unique=True)
     retention_summary: Mapped[str] = mapped_column(Text)
-    trains_on_data: Mapped[Tri] = mapped_column(_enum(Tri, "tri_trains"), default=Tri.UNKNOWN)
-    human_review: Mapped[Tri] = mapped_column(_enum(Tri, "tri_review"), default=Tri.UNKNOWN)
+    trains_on_data: Mapped[Tri] = mapped_column(enum_col(Tri, "tri_trains"), default=Tri.UNKNOWN)
+    human_review: Mapped[Tri] = mapped_column(enum_col(Tri, "tri_review"), default=Tri.UNKNOWN)
     # Highest data class this provider is approved to receive. Defaults to synthetic only.
     max_data_class: Mapped[DataClass] = mapped_column(
-        _enum(DataClass, "data_class"), default=DataClass.SYNTHETIC
+        enum_col(DataClass, "data_class"), default=DataClass.SYNTHETIC
     )
     source_url: Mapped[str | None] = mapped_column(Text)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_by: Mapped[str | None] = mapped_column(String(128))
-    created_at: Mapped[datetime] = _created_at()
+    created_at: Mapped[datetime] = created_at_col()
 
 
 class RegisteredModel(Base):
@@ -101,7 +75,7 @@ class RegisteredModel(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = _uuid_pk()
+    id: Mapped[uuid.UUID] = uuid_pk()
     name: Mapped[str] = mapped_column(String(128), unique=True)
     policy_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("model_provider_policies.id"))
     # Exact identifier at the provider, e.g. "gemini-3.1-flash-lite".
@@ -118,13 +92,13 @@ class RegisteredModel(Base):
     )
     availability_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approval_status: Mapped[ApprovalStatus] = mapped_column(
-        _enum(ApprovalStatus, "approval_status"),
+        enum_col(ApprovalStatus, "approval_status"),
         default=ApprovalStatus.PENDING,
         server_default="pending",
     )
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = _created_at()
+    created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -176,27 +150,8 @@ class ModelRoute(Base):
         UniqueConstraint("alias", "priority"),
     )
 
-    id: Mapped[uuid.UUID] = _uuid_pk()
+    id: Mapped[uuid.UUID] = uuid_pk()
     alias: Mapped[str] = mapped_column(String(64))
     model_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"))
     priority: Mapped[int] = mapped_column(Integer)  # lower = tried first
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
-
-
-class Agent(Base):
-    __tablename__ = "agents"
-
-    agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    name: Mapped[str] = mapped_column(String(128))
-    description: Mapped[str] = mapped_column(Text)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
-    created_at: Mapped[datetime] = _created_at()
-
-
-class AgentModelPermission(Base):
-    __tablename__ = "agent_model_permissions"
-
-    agent_id: Mapped[str] = mapped_column(
-        ForeignKey("agents.agent_id", ondelete="CASCADE"), primary_key=True
-    )
-    route_alias: Mapped[str] = mapped_column(String(64), primary_key=True)

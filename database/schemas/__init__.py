@@ -1,7 +1,16 @@
+from database.schemas.agents import (
+    Agent,
+    AgentVersion,
+    AgentVersionMemory,
+    AgentVersionModelAlias,
+    AgentVersionTool,
+    MemoryMode,
+    ToolApproval,
+    VersionState,
+)
+from database.schemas.auth import AuditEvent, AuthSession, EnrollmentCode, RefreshToken, User
 from database.schemas.base import Base
 from database.schemas.registry import (
-    Agent,
-    AgentModelPermission,
     ApprovalStatus,
     DataClass,
     ModelCapability,
@@ -14,14 +23,25 @@ from database.schemas.registry import (
 
 __all__ = [
     "Agent",
-    "AgentModelPermission",
+    "AgentVersion",
+    "AgentVersionMemory",
+    "AgentVersionModelAlias",
+    "AgentVersionTool",
     "ApprovalStatus",
+    "AuditEvent",
+    "AuthSession",
     "Base",
     "DataClass",
+    "EnrollmentCode",
+    "MemoryMode",
     "ModelCapability",
     "ModelPricing",
     "ModelRoute",
     "ProviderPolicy",
+    "RefreshToken",
     "RegisteredModel",
+    "ToolApproval",
     "Tri",
+    "User",
+    "VersionState",
 ]

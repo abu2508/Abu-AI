@@ -4,6 +4,7 @@ model id."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,8 @@ class ResolvedModel:
     provider_model_id: str
     gateway_model_name: str
     max_output_tokens: int | None
+    input_per_million_usd: Decimal = Decimal(0)
+    output_per_million_usd: Decimal = Decimal(0)
 
 
 def rejection_reason(
@@ -81,6 +84,12 @@ class ModelRouter:
                     provider_model_id=model.provider_model_id,
                     gateway_model_name=model.gateway_model_name,
                     max_output_tokens=model.max_output_tokens,
+                    input_per_million_usd=Decimal(model.pricing.input_per_million)
+                    if model.pricing
+                    else Decimal(0),
+                    output_per_million_usd=Decimal(model.pricing.output_per_million)
+                    if model.pricing
+                    else Decimal(0),
                 )
             reasons.append(f"{model.name}: {reason}")
         raise NoRouteError(alias, reasons)
