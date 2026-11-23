@@ -384,8 +384,8 @@ tools). The agent version's own limits (steps, tokens, cost, time) and the spend
 **Memory.** Only the workflow's own agent namespace, plus `user` only if the agent version was explicitly
 granted it, is read; another agent's namespace or another user's memory is unreachable. Retrieved memory
 is passed as quoted untrusted data. Model-proposed memories go through `MemoryService.propose` with a
-forced `agent_inference` source, only into the agent's own namespace, capped per run; sensitive ones need
-the user's approval. Conversations are not saved.
+forced `agent_inference` source, only into the agent's own namespace, capped per run; every one needs the user's approval
+(initial-phase policy). Conversations are not saved.
 
 **Idempotency.** With an `Idempotency-Key`, a repeat returns the stored reply (`replayed: true`); the same
 key with a different body is 409; a concurrent duplicate is 409; a failed run can be retried under the
@@ -541,6 +541,17 @@ controller.
   providers only. `gemini-3.1-flash-lite` availability and rate limits are unverified live.
 - **Paid spending is single-lane by design.** Every reservation takes one row lock, so paid calls are
   serialised. Fine for one user; it is a throughput limit.
+- **Initial-phase memory policy:** every long-term memory proposed by an agent stays `proposed` until the
+  user approves it (`REQUIRE_APPROVAL_FOR_AGENT_WRITES` in `core/memory/service.py`, a code constant, not a
+  setting). An agent update of an existing memory is a pending proposal; the old value stays active until
+  the user approves. Approval resets retention to the type default, so an agent's requested shorter
+  retention is not carried across approval (the user's own writes honour it).
+- **Milestone 6 first full test run had 2 failures:** `test_migrations.py` (both tests) still expected the
+  pre-0007 table set. Reproduced deterministically on the exact commit (`9707259`) in an isolated worktree:
+  the same two failures, nothing else. A genuine omission in a test expectation (not environmental, not
+  flaky, no product defect); fixed in the Milestone 6 commit. The earlier report of "one identified, one
+  unidentified" was wrong: my run's output was truncated to its last lines, which hid that both failures
+  were the same cause.
 - **Held amounts are deliberately conservative.** A timeout or unknown cost counts the full worst-case
   reservation and freezes paid spending until the operator reconciles it (`spend resolve`, `spend unfreeze`).
   That is manual by design: the operator must read the provider's invoice.

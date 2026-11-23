@@ -70,6 +70,11 @@ import re  # noqa: E402
 _SENSITIVE_RX = re.compile(_SENSITIVE_TOPICS, re.I)
 _EMBED_MAX = 1000
 
+# Initial product phase: NO long-term memory proposed by an agent becomes active without the user's
+# approval (the user's own writes are unaffected). This is deliberately a code constant, not a setting:
+# loosening it is a reviewed code change, not a configuration drift.
+REQUIRE_APPROVAL_FOR_AGENT_WRITES = True
+
 
 @dataclass(frozen=True)
 class MemoryPolicy:
@@ -402,6 +407,8 @@ class MemoryService:
         )
 
         reasons: list[str] = []
+        if caller.kind == "agent" and REQUIRE_APPROVAL_FOR_AGENT_WRITES:
+            reasons.append("initial_phase_policy")  # every agent-proposed memory waits for the user
         if caller.kind != "user":
             if p.source_kind == "third_party_message":
                 reasons.append("third_party_content")

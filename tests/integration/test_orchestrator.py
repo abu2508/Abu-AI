@@ -657,8 +657,10 @@ async def test_conversations_are_not_saved_and_proposals_need_approval(booted: A
     assert len(r.memory_proposals) == 2  # cross-agent rejected; the 4th is over the cap of 3
     assert {"memory_proposal_rejected", "memory_proposals_truncated"} <= set(r.warnings)
     async with booted.sessions() as s:
-        rows = {x.status: x for x in (await s.execute(select(MemoryRecord))).scalars().all()}
-        assert set(rows) == {"active", "proposed"}  # sensitive => needs the user's approval
+        rows = {x.id: x for x in (await s.execute(select(MemoryRecord))).scalars().all()}
+        assert len(rows) == 2 and {x.status for x in rows.values()} == {
+            "proposed"
+        }  # EVERY one waits
         assert all(
             x.namespace == "daily_coach_agent" and x.source_kind == "agent_inference"
             for x in rows.values()

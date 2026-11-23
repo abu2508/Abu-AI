@@ -613,8 +613,11 @@ async def test_an_agents_embed_text_is_stored_but_not_embedded_until_the_user_ap
         )
     )
     assert (
-        r.status == "active" and embedder.seen == [] and await count(session, MemoryEmbedding) == 0
+        r.status == "proposed"
+        and embedder.seen == []
+        and await count(session, MemoryEmbedding) == 0
     )
+    await mem.approve(Caller.user(alice), r.id)  # initial-phase policy: the user approves first
     assert (
         await am.search("short morning plans", ["daily_coach_agent/notes"]) == []
     )  # not searchable yet
@@ -665,7 +668,8 @@ async def test_structured_and_transactional_data_is_never_embedded(
             data={"value": "07:30"},
         )
     )
-    assert r.status == "active"
+    assert r.status == "proposed"
+    await mem.approve(Caller.user(alice), r.id)
     with pytest.raises(PolicyViolationError, match="never embedded"):
         await mem.approve_embedding(Caller.user(alice), r.id, "reminder at seven thirty")
     with pytest.raises(PolicyViolationError, match="never embedded"):
@@ -762,7 +766,11 @@ async def test_low_risk_agent_facts_are_stored_unconfirmed_and_sensitive_ones_wa
     ok = await am.propose(
         p("daily_coach_agent/notes", "Prefers short morning plans", confidence=0.7)
     )
-    assert (ok.status, ok.needs_confirmation, ok.reasons) == ("active", False, [])
+    assert (ok.status, ok.needs_confirmation, ok.reasons) == (
+        "proposed",
+        True,
+        ["initial_phase_policy"],
+    )  # even a low-risk agent fact waits for the user
     view = await am.get(ok.id)
     assert (
         view.confirmed_at is None
@@ -902,7 +910,14 @@ async def test_retention_can_only_be_shortened_by_a_caller(
     short = await am.propose(
         p("daily_coach_agent/n", "another episode", memory_type="episodic", retention_days=5)
     )
-    v_long, v_short = await am.get(long.id), await am.get(short.id)
+    assert long.status == short.status == "proposed"
+    ulong = await mem.propose(
+        Caller.user(alice),
+        up("daily_coach_agent/n", "user episode", memory_type="episodic", retention_days=5),
+    )  # the user's own writes are active at once and honour a shortened retention
+    v_long, v_short = await am.get(long.id), await mem.get(Caller.user(alice), ulong.id)
+    await mem.approve(Caller.user(alice), long.id)
+    v_long = await am.get(long.id)
     assert 178 <= (v_long.retention_expires_at - datetime.now(UTC)).days <= 180  # type: ignore[operator]  # capped at the 180-day default
     assert 3 <= (v_short.retention_expires_at - datetime.now(UTC)).days <= 5  # type: ignore[operator]
 
@@ -963,7 +978,7 @@ async def test_updating_a_confirmed_fact_through_update_also_waits_for_approval(
         await am.update(original.id, p("daily_coach_agent/elsewhere", "moved"))
 
 
-async def test_unconfirmed_agent_facts_may_be_refined_by_the_agent_and_it_is_audited(
+async def test_agent_updates_never_overwrite_an_existing_memory_until_the_user_approves(
     mem: MemoryService,
     session: AsyncSession,
     gov: Governance,
@@ -974,11 +989,16 @@ async def test_unconfirmed_agent_facts_may_be_refined_by_the_agent_and_it_is_aud
         session, gov, mem, "daily_coach_agent", alice, (("daily_coach_agent/n", RW),)
     )
     v1 = await am.propose(p("daily_coach_agent/n", "Wakes at six", key="wake-time"))
+    assert v1.status == "proposed"
+    await mem.approve(Caller.user(alice), v1.id)  # now an active, user-confirmed fact
     v2 = await am.propose(p("daily_coach_agent/n", "Wakes at seven", key="wake-time"))
-    assert v2.status == "active" and v2.supersedes_id == v1.id
+    assert v2.status == "proposed" and v2.supersedes_id == v1.id
+    # The confirmed value is untouched and is still what is retrievable.
+    assert [v.text for v in await am.list_memories("daily_coach_agent/n")] == ["Wakes at six"]
+    await mem.approve(Caller.user(alice), v2.id)  # only the user's approval replaces it
     assert [v.text for v in await am.list_memories("daily_coach_agent/n")] == ["Wakes at seven"]
-    created = await events(session, "memory.created")
-    assert any(e.detail.get("supersedes") == str(v1.id) for e in created)
+    proposed = await events(session, "memory.proposed")
+    assert any(e.detail.get("supersedes") == str(v1.id) for e in proposed)
 
 
 async def test_the_user_can_edit_their_own_memory_and_old_values_stop_being_retrievable(
@@ -1297,7 +1317,8 @@ async def test_structured_memory_is_validated_exact_and_keyed(
             data={"value": "07:30"},
         )
     )
-    assert ok.status == "active"
+    assert ok.status == "proposed"
+    await mem.approve(Caller.user(alice), ok.id)
     got = await am.get_structured(ns, "reminder-time")
     assert got is not None and got.data == {"value": "07:30"} and got.schema_name == "preference"
     assert await am.get_structured(ns, "missing") is None
@@ -1412,7 +1433,7 @@ async def test_every_access_is_logged_without_content_and_user_ops_are_attribute
     ]
     assert rows[0].execution_id == ctx.execution_id and rows[2].actor_id == str(alice)
     assert MARK not in json.dumps([x.__dict__ for x in rows], default=str)
-    audit = await events(session, "memory.created")
+    audit = await events(session, "memory.proposed")
     assert audit and MARK not in json.dumps([e.detail for e in audit])
     assert (await session.execute(select(MemoryRecord.last_accessed_at))).scalar_one() is not None
 
@@ -1448,8 +1469,10 @@ async def test_retrieval_excludes_flagged_text_even_if_it_somehow_became_active_
     r = await am.propose(
         p("daily_coach_agent/n", "Likes quiet cafes", embed_text="likes quiet cafes")
     )
+    await mem.approve(Caller.user(alice), r.id)
     await mem.approve_embedding(Caller.user(alice), r.id)
     assert [h.id for h in await am.search("quiet cafes", ["daily_coach_agent/n"])] == [r.id]
+    await session.execute(text("UPDATE memory_records SET confirmed_at = NULL"))  # forced bad state
     await session.execute(
         text("""UPDATE memory_records SET flags = '["override_instructions"]'::jsonb""")
     )  # forced bad state
@@ -1460,3 +1483,28 @@ async def test_retrieval_excludes_flagged_text_even_if_it_somehow_became_active_
     )  # the user reviewed it
     await session.commit()
     assert [h.id for h in await am.search("quiet cafes", ["daily_coach_agent/n"])] == [r.id]
+
+
+async def test_initial_phase_every_agent_memory_is_pending_and_user_writes_are_not(
+    mem: MemoryService,
+    session: AsyncSession,
+    gov: Governance,
+    two_users: tuple[uuid.UUID, uuid.UUID],
+) -> None:
+    from core.memory import service as memory_service
+
+    assert memory_service.REQUIRE_APPROVAL_FOR_AGENT_WRITES is True
+    alice, _ = two_users
+    am, _ = await agent(
+        session, gov, mem, "daily_coach_agent", alice, (("daily_coach_agent/n", RW),)
+    )
+    for memory_type in ("semantic", "episodic"):
+        r = await am.propose(
+            p("daily_coach_agent/n", f"low risk {memory_type}", memory_type=memory_type)
+        )
+        assert (
+            r.status == "proposed" and r.needs_confirmation and "initial_phase_policy" in r.reasons
+        )
+    mine = await mem.propose(Caller.user(alice), up("daily_coach_agent/n", "my own note"))
+    assert mine.status == "active"  # the user's own writes are unaffected
+    assert [v.text for v in await am.list_memories("daily_coach_agent/n")] == ["my own note"]
