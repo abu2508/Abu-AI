@@ -18,6 +18,8 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.2,<4",
     "pgvector>=0.5,<1",
     "cryptography>=46,<51",
+    "openpyxl>=3.1,<4",
+    "pypdf>=5,<7",
 ]
 
 [dependency-groups]
@@ -56,3 +58,7 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["services", "core", "agents", "domain", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["openpyxl", "openpyxl.*"]
+ignore_missing_imports = true

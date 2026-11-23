@@ -34,6 +34,9 @@ class Settings(BaseSettings):
 
     # --- request hardening ----------------------------------------------------------
     max_request_bytes: int = Field(default=64 * 1024, ge=1024, le=10 * 1024 * 1024)
+    max_import_bytes: int = Field(
+        default=3 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024
+    )  # file-import routes only
     # Number of trusted reverse proxies (Caddy = 1) whose X-Forwarded-For hop we believe.
     # 0 (default): ignore X-Forwarded-For entirely, use the socket peer.
     trusted_proxy_hops: int = Field(default=0, ge=0, le=5)

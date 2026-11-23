@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from core.governance.service import Governance
 from core.memory.runtime import build_keyring, open_runtime, verify_embedding_dimension
 from core.orchestrator.orchestrator import Orchestrator
-from services.api import agents, governance, health, memory, orchestrator
+from services.api import agents, finance, governance, health, memory, orchestrator
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine, create_sessionmaker
@@ -74,6 +74,7 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.include_router(governance.router)
     app.include_router(memory.router)
     app.include_router(orchestrator.router)
+    app.include_router(finance.router)
 
     # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
     app.add_middleware(
@@ -83,6 +84,12 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
         per_minute=settings.rate_limit_ip_per_minute,
         auth_per_minute=settings.rate_limit_auth_per_minute,
     )
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_request_bytes,
+        path_limits={
+            "/v1/finance/import": settings.max_import_bytes * 4 // 3 + 1024
+        },  # base64 overhead
+    )
     app.add_middleware(HardeningHeadersMiddleware)
     return app

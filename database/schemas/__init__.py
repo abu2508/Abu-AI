@@ -10,6 +10,15 @@ from database.schemas.agents import (
 )
 from database.schemas.auth import AuditEvent, AuthSession, EnrollmentCode, RefreshToken, User
 from database.schemas.base import Base
+from database.schemas.finance import (
+    FinAccount,
+    FinBudget,
+    FinImportBatch,
+    FinLoan,
+    FinMerchantRule,
+    FinSubscription,
+    FinTransaction,
+)
 from database.schemas.governance import (
     ABSOLUTE_MONTHLY_CEILING_INR,
     Execution,
@@ -38,6 +47,13 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "FinAccount",
+    "FinBudget",
+    "FinImportBatch",
+    "FinLoan",
+    "FinMerchantRule",
+    "FinSubscription",
+    "FinTransaction",
     "OrchestratorRun",
     "EMBEDDING_DIM",
     "AgentThread",

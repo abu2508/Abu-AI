@@ -37,7 +37,16 @@ GOVERNANCE = {
 }
 MEMORY = {"memory_records", "memory_embeddings", "memory_access_logs", "agent_threads"}
 ORCHESTRATOR = {"orchestrator_runs"}
-HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY | ORCHESTRATOR
+FINANCE = {
+    "fin_accounts",
+    "fin_transactions",
+    "fin_import_batches",
+    "fin_merchant_rules",
+    "fin_loans",
+    "fin_subscriptions",
+    "fin_budgets",
+}
+HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY | ORCHESTRATOR | FINANCE
 
 
 def tables(url: URL) -> set[str]:
@@ -105,8 +114,11 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
             is True
         )
 
-    command.downgrade(cfg, "0006")  # drops only orchestrator_runs
-    assert tables(url) == HEAD - ORCHESTRATOR
+    command.downgrade(cfg, "0007")  # drops only the finance tables
+    assert tables(url) == HEAD - FINANCE
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "0006")  # drops orchestrator_runs and the finance tables
+    assert tables(url) == HEAD - ORCHESTRATOR - FINANCE
     command.upgrade(cfg, "head")
     command.downgrade(
         cfg, "0005"

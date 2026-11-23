@@ -45,17 +45,22 @@ async def _json_response(
 class BodySizeLimitMiddleware:
     """Rejects bodies over max_bytes: by Content-Length up front, and while streaming."""
 
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
-        self.app, self.max = app, max_bytes
+    def __init__(
+        self, app: ASGIApp, max_bytes: int, path_limits: dict[str, int] | None = None
+    ) -> None:
+        self.app, self.default, self.limits = app, max_bytes, path_limits or {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        limit = self.limits.get(
+            scope["path"], self.default
+        )  # exact-path overrides (file imports only)
         for name, value in scope["headers"]:
             if name == b"content-length":
                 try:
-                    if int(value) > self.max:
+                    if int(value) > limit:
                         await _json_response(send, 413, {"detail": "request too large"}, [])
                         return
                 except ValueError:
@@ -70,7 +75,7 @@ class BodySizeLimitMiddleware:
             msg = await receive()
             if msg["type"] == "http.request" and not rejected:
                 seen += len(msg.get("body", b""))
-                if seen > self.max:
+                if seen > limit:
                     # Answer 413 right here: raising would be rewritten into a 400 by the framework.
                     rejected = True
                     if not started:
