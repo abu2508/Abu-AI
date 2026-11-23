@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.agent_registry import service as agents
 from core.audit.service import ADMIN
+from core.governance.service import Governance
 from core.permissions.runtime import RunContext, start_run
 from database.schemas import User
 from database.seed.registry import MOCK_ALIAS, seed_registry
@@ -70,14 +71,20 @@ async def enroll_device(
 
 async def runnable_agent(
     session: AsyncSession,
+    gov: Governance,
     agent_id: str = "finance_agent",
     aliases: tuple[str, ...] = (MOCK_ALIAS,),
     user_id: uuid.UUID | None = None,
+    task_type: str = "test",
+    limits: agents.VersionLimits | None = None,
 ) -> RunContext:
-    """Seeds, grants the aliases on the draft, activates, enables, and returns a RunContext."""
+    """Seeds, grants the aliases on the draft, activates, enables, and returns a RunContext.
+    Commits first: execution records are written in their own transactions and must see the rows."""
     await seed_registry(session)
     for alias in aliases:
         await agents.grant_model_alias(session, agent_id, 1, alias)
+    if limits is not None:
+        await agents.update_limits(session, agent_id, 1, limits)
     await agents.activate_version(session, agent_id, 1)
     await agents.set_agent_enabled(session, agent_id, True)
     if user_id is None:
@@ -85,4 +92,25 @@ async def runnable_agent(
         session.add(user)
         await session.flush()
         user_id = user.id
-    return await start_run(session, user_id=user_id, agent_id=agent_id)
+    await session.commit()
+    return await start_run(
+        session, user_id=user_id, agent_id=agent_id, governance=gov, task_type=task_type
+    )
+
+
+async def enable_paid(
+    gov: Governance,
+    monthly: str = "300",
+    daily: str = "300",
+    rate: str = "100",
+    source: str = "test fixture",
+) -> None:
+    """Operator opt-in for paid spending (what `admin spend ...` does)."""
+    from decimal import Decimal
+
+    from core.audit.service import ADMIN
+    from core.governance import spending
+
+    await spending.set_budget(gov.factory, ADMIN, Decimal(monthly), Decimal(daily))
+    await spending.set_rate(gov.factory, ADMIN, Decimal(rate), source)
+    await spending.set_paid_models_enabled(gov.factory, ADMIN, True)

@@ -18,6 +18,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.audit.service import Actor, record_event, record_event_durable
+from core.governance.service import Governance
 from core.permissions.errors import (
     ApprovalRequiredError,
     LimitExceededError,
@@ -114,10 +115,12 @@ class ToolExecutor:
         self,
         session: AsyncSession,
         audit_factory: async_sessionmaker[AsyncSession],
+        governance: Governance,
         registry: ToolRegistry = DEFAULT_TOOLS,
     ) -> None:
         self._session = session
         self._audit = audit_factory
+        self._gov = governance
         self._registry = registry
 
     async def _deny(self, ctx: RunContext, tool: str, reason: str) -> None:
@@ -138,6 +141,7 @@ class ToolExecutor:
         approval_id: uuid.UUID | None = None,
         now: datetime | None = None,
     ) -> Any:
+        await self._gov.require_execution_allowed()  # kill switch: no new tool executions
         ctx.begin_step()
         spec = self._registry.get(tool_name)
         try:

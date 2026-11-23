@@ -2,13 +2,10 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from fastapi import FastAPI
 from sqlalchemy import select, text
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -18,33 +15,9 @@ from database.schemas import AuditEvent, AuthSession, EnrollmentCode, RefreshTok
 from database.seed.registry import seed_registry
 from services.api.auth import service as auth
 from services.api.auth import tokens
-from services.api.config import Settings
 from services.api.main import create_app
+from tests.integration.conftest import Api
 from tests.integration.helpers import Device, enroll_device, make_settings, make_user
-
-
-@dataclass
-class Api:
-    app: FastAPI
-    client: httpx.AsyncClient
-    settings: Settings
-    sessions: async_sessionmaker[AsyncSession]
-
-
-@pytest.fixture
-async def api(migrated_url: URL, sessions: async_sessionmaker[AsyncSession]) -> AsyncIterator[Api]:
-    settings = make_settings(migrated_url)
-    app = create_app(settings)
-    async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app, client=("203.0.113.5", 4000))
-        async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
-            yield Api(app, client, settings, sessions)
-
-
-@pytest.fixture
-async def device(api: Api) -> Device:
-    uid = await make_user(api.sessions)
-    return await enroll_device(api.sessions, api.settings, api.client, uid)
 
 
 async def audit_types(api: Api) -> list[str]:
@@ -329,7 +302,7 @@ async def test_app_token_cannot_enable_grant_or_activate(api: Api, device: Devic
     ]
     for method, path in attempts:
         resp = await api.client.request(method, path, headers=h, json={})
-        assert resp.status_code in (404, 405), f"{method} {path} -> {resp.status_code}"
+        assert resp.status_code in (403, 404, 405), f"{method} {path} -> {resp.status_code}"
     agent = (await api.client.get("/v1/agents/finance_agent", headers=h)).json()
     assert agent["enabled"] is False and agent["active_version"] is None
     assert agent["versions"][0]["model_aliases"] == [] and agent["versions"][0]["tools"] == {}
@@ -396,3 +369,159 @@ async def test_per_user_rate_limit(
 async def test_user_model_untouched(api: Api, device: Device) -> None:
     async with api.sessions() as s:
         assert (await s.execute(select(User))).scalar_one().id == device.user_id
+
+
+# --- idempotent refresh retry (lost response) ---------------------------------------------------------------
+
+
+KEY = "retry-key-0123456789abcdef"
+
+
+async def refresh(api: Api, token: str, key: str | None = None) -> httpx.Response:
+    headers = {"Idempotency-Key": key} if key else {}
+    return await api.client.post("/v1/auth/refresh", json={"refresh_token": token}, headers=headers)
+
+
+async def session_row(api: Api) -> AuthSession:
+    async with api.sessions() as s:
+        return (await s.execute(select(AuthSession))).scalar_one()
+
+
+async def test_retry_with_the_same_idempotency_key_recovers_a_lost_response(
+    api: Api, device: Device
+) -> None:
+    first = await refresh(
+        api, device.refresh, KEY
+    )  # the server rotated, but suppose the response was lost
+    assert first.status_code == 200
+    retry = await refresh(api, device.refresh, KEY)  # the client retries the SAME request
+    assert retry.status_code == 200
+    recovered = retry.json()
+    assert recovered["refresh_token"] not in (device.refresh, first.json()["refresh_token"])
+    assert (
+        await refresh(api, recovered["refresh_token"])
+    ).status_code == 200  # the replacement chain works
+    assert (await session_row(api)).revoked_at is None
+    assert "auth.refresh_retried" in await audit_types(api)
+
+
+async def test_the_superseded_token_is_dead_and_using_it_trips_reuse_detection(
+    api: Api, device: Device
+) -> None:
+    lost = (await refresh(api, device.refresh, KEY)).json()  # the response the client never saw
+    retried = (await refresh(api, device.refresh, KEY)).json()
+    # Anyone holding the first child (e.g. an interceptor of the lost response) hits reuse detection:
+    assert (await refresh(api, lost["refresh_token"])).status_code == 401
+    row = await session_row(api)
+    assert row.revoked_reason == "refresh_token_reuse"
+    assert (
+        await refresh(api, retried["refresh_token"])
+    ).status_code == 401  # whole session is gone
+
+
+@pytest.mark.parametrize("retry_key", [None, "a-different-key-0123456789", "x" * 16])
+async def test_retry_without_the_matching_key_is_treated_as_reuse(
+    api: Api, device: Device, retry_key: str | None
+) -> None:
+    assert (await refresh(api, device.refresh, KEY)).status_code == 200
+    assert (await refresh(api, device.refresh, retry_key)).status_code == 401
+    assert (
+        await session_row(api)
+    ).revoked_reason == "refresh_token_reuse"  # strict behaviour is unchanged
+
+
+async def test_a_stolen_token_without_the_key_cannot_use_the_retry_path(
+    api: Api, device: Device
+) -> None:
+    assert (await refresh(api, device.refresh, KEY)).status_code == 200  # legitimate client rotates
+    assert (
+        await refresh(api, device.refresh)
+    ).status_code == 401  # thief replays the old token: no key
+    assert (await session_row(api)).revoked_at is not None
+
+
+async def test_only_one_retry_is_honoured(api: Api, device: Device) -> None:
+    await refresh(api, device.refresh, KEY)
+    assert (await refresh(api, device.refresh, KEY)).status_code == 200
+    assert (await refresh(api, device.refresh, KEY)).status_code == 401  # a second retry is reuse
+    assert (await session_row(api)).revoked_at is not None
+
+
+async def test_retry_after_the_child_was_used_is_reuse(api: Api, device: Device) -> None:
+    first = (await refresh(api, device.refresh, KEY)).json()
+    assert (
+        await refresh(api, first["refresh_token"])
+    ).status_code == 200  # the client DID get it and moved on
+    assert (
+        await refresh(api, device.refresh, KEY)
+    ).status_code == 401  # so a later retry is not a lost response
+    assert (await session_row(api)).revoked_at is not None
+
+
+async def test_retry_window_is_short(api: Api, device: Device) -> None:
+    now = datetime.now(UTC)
+    async with api.sessions() as s, s.begin():
+        await auth.refresh(s, api.settings, device.refresh, now=now, idempotency_key=KEY)
+    async with api.sessions() as s:
+        with pytest.raises(auth.AuthError):  # 31 s later: outside the 30 s window
+            await auth.refresh(
+                s,
+                api.settings,
+                device.refresh,
+                now=now + timedelta(seconds=31),
+                idempotency_key=KEY,
+            )
+        await s.commit()
+    assert (await session_row(api)).revoked_reason == "refresh_token_reuse"
+
+
+async def test_retry_inside_the_window_works_at_the_service_level(api: Api, device: Device) -> None:
+    now = datetime.now(UTC)
+    async with api.sessions() as s, s.begin():
+        await auth.refresh(s, api.settings, device.refresh, now=now, idempotency_key=KEY)
+    async with api.sessions() as s, s.begin():
+        pair = await auth.refresh(
+            s, api.settings, device.refresh, now=now + timedelta(seconds=29), idempotency_key=KEY
+        )
+    assert pair.refresh_token
+
+
+async def test_retry_is_refused_for_a_revoked_session_or_disabled_user(
+    api: Api, device: Device
+) -> None:
+    await refresh(api, device.refresh, KEY)
+    await api.client.post("/v1/auth/logout", headers=device.headers)
+    assert (await refresh(api, device.refresh, KEY)).status_code == 401
+
+
+async def test_the_idempotency_key_is_stored_only_as_a_hash(api: Api, device: Device) -> None:
+    await refresh(api, device.refresh, KEY)
+    async with api.sessions() as s:
+        hashes = [
+            h for h in (await s.execute(select(RefreshToken.rotation_key_hash))).scalars() if h
+        ]
+    assert len(hashes) == 1 and len(hashes[0]) == 64 and KEY not in hashes[0]
+    dump = await _dump_all_text(api)
+    assert KEY not in dump
+
+
+@pytest.mark.parametrize("bad_key", ["short", "has spaces in the key!!", "x" * 200])
+async def test_malformed_idempotency_keys_are_rejected(
+    api: Api, device: Device, bad_key: str
+) -> None:
+    resp = await api.client.post(
+        "/v1/auth/refresh",
+        json={"refresh_token": device.refresh},
+        headers={"Idempotency-Key": bad_key},
+    )
+    assert resp.status_code == 422  # rejected by validation, never silently accepted
+    assert (await session_row(api)).revoked_at is None  # and it did not touch the session
+
+
+async def test_concurrent_retries_with_one_key_cannot_mint_two_live_chains(
+    api: Api, device: Device
+) -> None:
+    await refresh(api, device.refresh, KEY)
+    results = await asyncio.gather(*(refresh(api, device.refresh, KEY) for _ in range(4)))
+    codes = sorted(r.status_code for r in results)
+    assert codes.count(200) <= 1  # the row lock serialises them; at most one retry is honoured

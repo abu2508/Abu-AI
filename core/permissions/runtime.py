@@ -14,6 +14,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.governance.errors import GovernanceError
+from core.governance.service import Governance
 from core.permissions.errors import (
     AgentNotPermittedError,
     LimitExceededError,
@@ -58,6 +60,9 @@ class RunContext:
     model_aliases: frozenset[str]
     tools: dict[str, bool]  # tool name -> requires_approval
     memory: dict[str, MemoryMode]  # namespace -> mode
+    execution_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    trace_id: str = ""
+    task_type: str = "general"
     clock: Callable[[], float] = field(default=time.monotonic, repr=False)
     started_at: float = 0.0
     steps_used: int = 0
@@ -123,9 +128,41 @@ class RunContext:
         raise PermissionDeniedError("memory namespace not granted")
 
 
-async def start_run(session: AsyncSession, *, user_id: uuid.UUID, agent_id: str) -> RunContext:
-    """The only way to get a RunContext. Refuses unknown/disabled agents and agents with no
-    ACTIVE version; permissions are read fresh from the database on every run."""
+async def start_run(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    agent_id: str,
+    governance: Governance,
+    task_type: str = "general",
+    trace_id: str | None = None,
+) -> RunContext:
+    """The only way to get a RunContext. Order matters:
+      1. kill switch (fail closed) - nothing else is even consulted if execution is blocked;
+      2. unknown/disabled agent or user, or no ACTIVE version => refused;
+      3. an execution record is created (own transaction) and its id travels in the context.
+    Queued or scheduled work must call this at dequeue time, so an active kill switch stops it."""
+    try:
+        await governance.require_execution_allowed()
+    except GovernanceError as exc:
+        await governance.audit_blocked(user_id, agent_id, "blocked", type(exc).__name__)
+        raise
+    ctx = await _load_context(session, user_id=user_id, agent_id=agent_id)
+    execution_id, trace = await governance.begin(
+        user_id=user_id,
+        agent_id=agent_id,
+        version_id=ctx.version_id,
+        version=ctx.version,
+        task_type=task_type,
+        trace_id=trace_id,
+    )
+    ctx.execution_id, ctx.trace_id, ctx.task_type = execution_id, trace, task_type
+    return ctx
+
+
+async def _load_context(session: AsyncSession, *, user_id: uuid.UUID, agent_id: str) -> RunContext:
+    """Refuses unknown/disabled agents and agents with no ACTIVE version; permissions are read
+    fresh from the database on every run."""
     user = await session.get(User, user_id)
     if user is None or user.disabled_at is not None:
         raise AgentNotPermittedError("unknown user")

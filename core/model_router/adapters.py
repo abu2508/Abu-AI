@@ -1,6 +1,7 @@
 """Provider adapters. Adapters only transport; routing and permission decisions are made earlier."""
 
 import time
+from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
 import httpx
@@ -11,7 +12,16 @@ from core.model_router.types import CompletionRequest, CompletionResult
 
 
 class ProviderError(Exception):
-    """Generic provider failure. Never includes provider response bodies or request content."""
+    """Generic provider failure. Never includes provider response bodies or request content.
+
+    maybe_charged: True when the provider MAY have processed (and billed) the request - a timeout,
+    5xx, dropped connection or unparsable answer. False when it definitely did not: the request
+    never left (connect failure) or was rejected outright (4xx).
+    """
+
+    def __init__(self, message: str, *, maybe_charged: bool = False) -> None:
+        super().__init__(message)
+        self.maybe_charged = maybe_charged
 
 
 class ProviderAdapter(Protocol):
@@ -38,8 +48,8 @@ class MockAdapter:
 
 
 class _Usage(BaseModel):
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 class _Message(BaseModel):
@@ -52,7 +62,7 @@ class _Choice(BaseModel):
 
 class _ChatResponse(BaseModel):
     choices: list[_Choice]
-    usage: _Usage = _Usage()
+    usage: _Usage | None = None
 
 
 class LiteLLMAdapter:
@@ -91,15 +101,41 @@ class LiteLLMAdapter:
                 )
             resp.raise_for_status()
             parsed = _ChatResponse.model_validate(resp.json())
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            raise ProviderError("gateway unreachable", maybe_charged=False) from None
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            charged = status >= 500 or status == 408  # 4xx: rejected before processing
+            raise ProviderError(f"gateway returned HTTP {status}", maybe_charged=charged) from None
         except (httpx.HTTPError, ValidationError, ValueError) as exc:
-            raise ProviderError(f"gateway call failed ({type(exc).__name__})") from None
+            raise ProviderError(
+                f"gateway call failed ({type(exc).__name__})", maybe_charged=True
+            ) from None
         if not parsed.choices or parsed.choices[0].message.content is None:
-            raise ProviderError("gateway returned no content")
+            raise ProviderError("gateway returned no content", maybe_charged=True)
+        usage = parsed.usage
+        reported = (
+            usage is not None
+            and usage.prompt_tokens is not None
+            and usage.completion_tokens is not None
+        )
         return CompletionResult(
             text=parsed.choices[0].message.content,
-            input_tokens=parsed.usage.prompt_tokens,
-            output_tokens=parsed.usage.completion_tokens,
+            input_tokens=(usage.prompt_tokens or 0) if usage else 0,
+            output_tokens=(usage.completion_tokens or 0) if usage else 0,
             model_name=model.name,
             provider=model.provider,
             latency_ms=(time.perf_counter() - start) * 1000,
+            usage_reported=reported,
+            provider_cost_usd=_parse_cost(resp.headers.get("x-litellm-response-cost")),
         )
+
+
+def _parse_cost(raw: str | None) -> Decimal | None:
+    if raw is None:
+        return None
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() and value >= 0 else None

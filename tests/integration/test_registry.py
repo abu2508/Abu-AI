@@ -110,12 +110,21 @@ async def test_cannot_enable_unapproved(with_policy: AsyncSession) -> None:
         await registry.set_enabled(with_policy, "m1", True)
 
 
-async def test_paid_model_can_be_approved_but_never_enabled(with_policy: AsyncSession) -> None:
+async def test_paid_model_cannot_be_enabled_until_operator_opts_in(
+    with_policy: AsyncSession,
+) -> None:
     s = with_policy
     await registry.register_model(s, model_in("paid", price="1.5"))
     await registry.approve_model(s, "paid")
-    with pytest.raises(ApprovalError, match="paid"):
+    with pytest.raises(ApprovalError, match="not opted in"):  # default: paid models off, budget 0
         await registry.set_enabled(s, "paid", True)
+    await s.execute(
+        text("UPDATE spending_config SET monthly_budget_inr = 10, daily_budget_inr = 5")
+    )
+    with pytest.raises(ApprovalError, match="not opted in"):  # a budget alone is not an opt-in
+        await registry.set_enabled(s, "paid", True)
+    await s.execute(text("UPDATE spending_config SET paid_models_enabled = true"))
+    assert (await registry.set_enabled(s, "paid", True)).enabled is True
 
 
 async def test_models_default_to_pending_and_disabled(with_policy: AsyncSession) -> None:

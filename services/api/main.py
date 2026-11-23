@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from services.api import agents, health
+from services.api import agents, governance, health
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine, create_sessionmaker
@@ -34,7 +34,7 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
 
     app = FastAPI(
         title="Abu AI",
-        version="0.3.0",
+        version="0.4.0",
         lifespan=lifespan,
         # Interactive docs are development-only.
         docs_url="/docs" if settings.docs_enabled else None,
@@ -48,6 +48,7 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.include_router(health.router)
     app.include_router(auth_routes.router)
     app.include_router(agents.router)
+    app.include_router(governance.router)
 
     # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
     app.add_middleware(

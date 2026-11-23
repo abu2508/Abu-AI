@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.api.auth import service
@@ -67,10 +68,18 @@ async def enroll(body: EnrollRequest, session: SessionDep, settings: SettingsDep
 
 @router.post("/auth/refresh", response_model=TokenResponse)
 async def refresh(
-    body: RefreshRequest, session: SessionDep, settings: SettingsDep
+    body: RefreshRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+    idempotency_key: Annotated[
+        str | None, Header(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    ] = None,
 ) -> TokenResponse:
+    """Send the same Idempotency-Key header when retrying a refresh whose response was lost."""
     try:
-        pair = await service.refresh(session, settings, body.refresh_token)
+        pair = await service.refresh(
+            session, settings, body.refresh_token, idempotency_key=idempotency_key
+        )
         await session.commit()
     except service.AuthError as exc:
         raise await commit_or_translate(session, exc) from None

@@ -6,10 +6,12 @@ except that an AuthError with persist=True means "commit what was written before
 (used for refresh-token reuse detection, which must stick even though the request fails).
 """
 
+import hmac
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from pydantic import SecretStr
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,9 @@ from services.api.auth import tokens
 from services.api.config import Settings
 
 LAST_USED_RESOLUTION = timedelta(minutes=1)
+# A lost refresh response may be retried ONCE, within this window, by presenting the same
+# Idempotency-Key as the original request. See refresh() for why this does not weaken reuse detection.
+RETRY_WINDOW = timedelta(seconds=30)
 
 
 class AuthError(Exception):
@@ -197,9 +202,28 @@ async def revoke_session(
         )
 
 
+def _idem_hash(hash_key: SecretStr, key: str | None) -> str | None:
+    return tokens.hash_secret(hash_key, "idem:" + key) if key else None
+
+
 async def refresh(
-    session: AsyncSession, settings: Settings, refresh_token: str, now: datetime | None = None
+    session: AsyncSession,
+    settings: Settings,
+    refresh_token: str,
+    now: datetime | None = None,
+    idempotency_key: str | None = None,
 ) -> TokenPair:
+    """Rotate a refresh token.
+
+    Idempotent retry (lost response): if the SAME token comes back with the SAME Idempotency-Key
+    that rotated it, within RETRY_WINDOW, at most once, and its child has not been used yet, we
+    issue a replacement child and mark the previous child as used (superseded). Reuse detection
+    stays intact: the superseded child, if ever presented, revokes the whole session; a retry with
+    a different/missing key, after the window, a second retry, or after the child was used, is
+    treated as reuse exactly as before. An attacker holding only a stolen token does not know the
+    key; one who captured the whole request gets at most one replacement inside 30s, and the real
+    client's next refresh then trips the reuse detector.
+    """
     now = _now(now)
     _, hash_key = settings.require_auth_secrets()
     row = (
@@ -224,6 +248,39 @@ async def refresh(
         raise AuthError
     actor = Actor.user(auth_session.user_id, auth_session.id)
     user = await session.get(User, auth_session.user_id)
+
+    retry = (
+        row.used_at is not None
+        and idempotency_key is not None
+        and row.rotation_key_hash is not None
+        and hmac.compare_digest(row.rotation_key_hash, _idem_hash(hash_key, idempotency_key) or "")
+        and row.retry_count == 0
+        and now - row.used_at <= RETRY_WINDOW
+        and row.replaced_by_id is not None
+        and auth_session.revoked_at is None
+        and auth_session.expires_at > now
+        and user is not None
+        and user.disabled_at is None
+    )
+    if retry:
+        child = await session.get(RefreshToken, row.replaced_by_id, with_for_update=True)
+        if child is not None and child.used_at is None:
+            child.used_at = now  # superseded: presenting it later counts as reuse
+            pair = await _issue_pair(session, settings, auth_session, now)
+            new_row = (
+                await session.execute(
+                    select(RefreshToken).where(
+                        RefreshToken.token_hash == tokens.hash_secret(hash_key, pair.refresh_token)
+                    )
+                )
+            ).scalar_one()
+            row.replaced_by_id = new_row.id
+            row.retry_count = 1
+            auth_session.last_used_at = now
+            await record_event(
+                session, actor, "auth.refresh_retried", "auth_session", str(auth_session.id)
+            )
+            return pair
 
     if row.used_at is not None:
         # A rotated-out token came back: either the legitimate client lost a response or the
@@ -256,6 +313,7 @@ async def refresh(
         raise AuthError(persist=True)
 
     row.used_at = now
+    row.rotation_key_hash = _idem_hash(hash_key, idempotency_key)
     pair = await _issue_pair(session, settings, auth_session, now)
     new_row = (
         await session.execute(

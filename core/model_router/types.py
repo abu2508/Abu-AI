@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,3 +28,8 @@ class CompletionResult(BaseModel):
     model_name: str
     provider: str
     latency_ms: float
+    # False when the provider did not report token usage: the cost is then UNKNOWN (fail closed).
+    usage_reported: bool = True
+    # Cost as reported by the gateway (LiteLLM) in USD, if any. Used as the confirmed cost; never
+    # added on top of the application ledger (one ledger row per call => no double counting).
+    provider_cost_usd: Decimal | None = None

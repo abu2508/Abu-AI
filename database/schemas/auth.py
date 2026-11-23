@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, String, text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -56,6 +56,10 @@ class RefreshToken(Base):
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("refresh_tokens.id", ondelete="SET NULL")
     )
+    # Idempotent-retry support: hash of the client's Idempotency-Key at rotation time, and how
+    # many retries were honoured (at most one). See services/api/auth/service.py.
+    rotation_key_hash: Mapped[str | None] = mapped_column(String(64))
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class EnrollmentCode(Base):

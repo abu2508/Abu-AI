@@ -109,6 +109,9 @@ async def set_agent_enabled(
     session: AsyncSession, agent_id: str, enabled: bool, actor: Actor = SYSTEM
 ) -> Agent:
     agent = await get_agent(session, agent_id)
+    if enabled and actor.type == "user":
+        # An app/user token may only REDUCE what agents can do. Re-enabling is operator-only.
+        raise PermissionDeniedError("re-enabling an agent is operator-only")
     if enabled and await get_active_version(session, agent_id) is None:
         raise ApprovalError(f"cannot enable {agent_id!r}: it has no active version")
     if agent.enabled != enabled:

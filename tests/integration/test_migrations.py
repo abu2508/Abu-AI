@@ -28,7 +28,14 @@ AGENTS_HEAD = {
     "agent_version_memory",
     "tool_approvals",
 }
-HEAD = REGISTRY | AUTH | AGENTS_HEAD
+GOVERNANCE = {
+    "kill_switch_state",
+    "spending_config",
+    "executions",
+    "execution_calls",
+    "spend_ledger",
+}
+HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE
 
 
 def tables(url: URL) -> set[str]:
@@ -74,7 +81,9 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
 
     command.upgrade(cfg, "0003")
     assert tables(url) == REGISTRY | AGENTS_0002 | AUTH
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "0004")
+    assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD
+    command.upgrade(cfg, "head")  # 0005: governance
     assert tables(url) == HEAD
     with eng.connect() as c:
         assert c.execute(text("SELECT count(*) FROM model_provider_policies")).scalar_one() == 1
@@ -92,6 +101,9 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
             is True
         )
 
+    command.downgrade(cfg, "0004")  # drops governance tables and the refresh-retry columns
+    assert tables(url) == REGISTRY | AUTH | AGENTS_HEAD
+    command.upgrade(cfg, "head")
     command.downgrade(cfg, "0003")  # restores the legacy permission table from the active version
     with eng.connect() as c:
         assert c.execute(
@@ -157,4 +169,26 @@ def test_database_refuses_enabled_unapproved_model(scratch_db: Callable[[], URL]
                 "SELECT 'm', id, 'x', 'x', true FROM model_provider_policies"
             )
         )
+    eng.dispose()
+
+
+def test_governance_singletons_are_seeded_safe_by_default(scratch_db: Callable[[], URL]) -> None:
+    url = scratch_db()
+    command.upgrade(alembic_config(url), "head")
+    eng = create_engine(url)
+    with eng.connect() as c:
+        assert c.execute(text("SELECT active FROM kill_switch_state")).all() == [(False,)]
+        row = c.execute(
+            text(
+                "SELECT monthly_budget_inr, daily_budget_inr, paid_models_enabled, paid_frozen, usd_inr_rate "
+                "FROM spending_config"
+            )
+        ).one()
+        assert (row[0], row[1], row[2], row[3], row[4]) == (
+            0,
+            0,
+            False,
+            False,
+            None,
+        )  # default spend: INR 0
     eng.dispose()

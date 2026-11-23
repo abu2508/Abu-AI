@@ -4,8 +4,9 @@
 **personal messaging assistant** and a **daily coach** — built to run on a single modest VPS with a
 hard AI API budget of ₹0–₹300 per month.
 
-> Status: **Milestone 3 — authentication and the Agent Registry.** No real model has been called,
-> no sensitive data is sent anywhere, and there is no mobile app yet. See the roadmap below.
+> Status: **Milestone 4 — governance and cost control.** No real model has been called, no paid
+> provider is enabled (spend is INR 0), no sensitive data is sent anywhere, and there is no mobile
+> app yet. See the roadmap below.
 
 ## Architecture (current)
 
@@ -121,6 +122,14 @@ $A version show|create|clone|activate|retire <agent_id> [n]
 $A grant model|tool|memory <agent_id> <n> <value> [--mode read|read_write]
 $A revoke model_alias|tool|memory <agent_id> <n> <value>
 $A enable|disable <agent_id>
+$A kill-switch activate|deactivate --reason "..."     $A kill-switch status
+$A spend status
+$A spend set-budget --monthly 300 --daily 20          # hard ceiling INR 300/month
+$A spend set-rate --rate 88.5 --source "RBI reference rate 2026-11-23"
+$A spend paid on|off                                  # default off
+$A spend unfreeze --reason "..."                      # after a hold/unknown-cost incident
+$A spend resolve <ledger-id> --confirmed-inr 1.25 | --not-charged
+$A executions list --limit 20
 ```
 
 The `admin` service is opt-in (compose profile), publishes no ports and has no internet route.
@@ -157,6 +166,96 @@ empty draft version 1. Everything is **default-deny**.
   *reduce* privilege). Enabling, activating and every grant are operator-only, so a stolen app token cannot
   widen an agent.
 
+## Governance and cost control (Milestone 4)
+
+### Spending: INR 300/month is a ceiling, not a target. The default is INR 0.
+
+| Setting | Default | Who can change it |
+|---|---|---|
+| Monthly paid budget | **INR 0** | operator CLI only; hard maximum **INR 300** (code + DB `CHECK`) |
+| Daily paid budget | INR 0 (never above monthly) | operator CLI only |
+| Paid models enabled | **off** | operator CLI only (needs a budget > 0 and a rate) |
+| USD→INR rate | **unset** (paid calls refused) | operator CLI only, with a named source; refused when older than 14 days |
+| Per-run cost cap | INR 0 per agent version (max 50) | operator CLI (agent version) |
+
+Raising the ceiling above INR 300 needs a migration, i.e. an explicit design decision.
+
+**The ledger (`spend_ledger`)** has one row per *paid provider attempt*: `reserved → settled | released`, or
+`reserved → held`. Settled/released rows are immutable and nothing is ever deleted (DB triggers).
+Counting for the budget: `settled` = confirmed cost, `reserved`/`held` = the **worst-case reservation**,
+`released` = 0, so an unresolved amount is never counted as zero. Periods use a configurable UTC offset
+(default IST, +05:30): day and month roll over at local midnight; a call is booked to the period it was
+*reserved* in.
+
+**No overspending under concurrency.** `reserve()` runs in its own *committed* transaction and takes
+`SELECT … FOR UPDATE` on the single `spending_config` row, so all paid reservations are serialised and each
+sees every earlier hold. The provider is only called after the reservation commits. (Tested: 12 concurrent
+INR-40 reservations against a INR-300 budget → exactly 7 succeed.)
+
+**Fail closed.**
+
+| Situation | What happens |
+|---|---|
+| Cost cannot be determined (no usage, no reported cost) | held at the worst case, **paid spending frozen** until the operator resolves it |
+| Timeout / 5xx / dropped connection after the request was sent | held, **frozen** (the provider may have billed) |
+| Connect failure / 4xx (provider never processed it) | released, not frozen |
+| Actual cost > reservation | the real amount is recorded, **frozen** |
+| Missing/stale rate, spending state unreadable | paid refused |
+| Same `call_key` presented again (retry/replay) | returns the existing row: **no second hold, no second provider call** |
+
+**No double counting.** One ledger row per call. Its confirmed amount is LiteLLM's reported cost
+(`x-litellm-response-cost`) if present, otherwise provider-reported tokens × the registry price. The other
+figure is stored only for reconciliation; LiteLLM's own spend tracking is never added on top.
+
+**Currency is explicit.** Registry prices are USD; the operator-set rate and its source are stored on every
+ledger row and execution call, and amounts are rounded **up**.
+
+**Routing never silently goes paid.** A paid model is a candidate only if governance allows paid spending
+*and no free route precedes it* in priority, whether that free route is failing, disabled or ineligible.
+Paid → free fallback is allowed. Every attempt, fallback and budget refusal is recorded.
+
+### Kill switch
+
+| Action | Operator CLI | Authenticated app |
+|---|---|---|
+| Activate the global kill switch | ✅ | ✅ |
+| Disable an individual agent | ✅ | ✅ |
+| **Deactivate** the kill switch | ✅ | ❌ 403, audited |
+| **Re-enable** an agent | ✅ | ❌ 403, audited |
+| Change budgets, rate, paid flag, model policies, provider config | ✅ | ❌ 403, audited |
+
+Activation records **who, when, why and through which interface**, and is stored in the database, so it
+survives restarts. A repeat activation keeps the original record (the attempt is still audited).
+
+- **Blocks:** new agent executions (`start_run`), every model call (`ModelGateway`, even with an existing
+  context), every tool call (`ToolExecutor`), and every paid reservation.
+- **Queued work:** any queued or scheduled job must start through `start_run`, so the switch is checked at
+  dequeue time. (There is no job queue yet; this is the contract for when there is.)
+- **Fail closed:** if the state is unreadable or its row is missing, execution is blocked.
+- **Stays available:** reads, execution history, audit access, authentication, session revocation, disabling
+  agents. (No data-export feature exists yet; when it does it must not depend on the kill switch.)
+- The explicit app routes for forbidden actions exist **only to answer 403 and write a durable audit
+  record**, so a compromised token probing for privilege leaves a trail.
+
+### Execution records
+
+`executions` (run level) and `execution_calls` (one per model attempt, so fallbacks are visible) record
+trace/execution/user/agent/version IDs, task type, alias, provider and exact model ID, tokens, **estimated
+(worst-case) and confirmed cost kept separately**, currency and rate, latency, status and a machine-coded
+failure reason, fallback info, policy decisions and timestamps. They are written in their own transactions
+(they survive a rolled-back request) and **hold no prompts, completions or tool arguments**: a test checks
+every governance table for a planted prompt and for content-capable column names. `GET /v1/executions`
+returns the caller's own records only.
+
+### Refresh-token retry (lost response)
+
+Assessed as practical. A client may send an `Idempotency-Key` header with a refresh. If the response is
+lost, the **same token + same key**, within **30 s**, **once**, and while the issued child is still unused,
+gets a replacement and the first child is marked used (superseded). Everything else is still reuse and
+revokes the session: no key, a different key, a second retry, after 30 s, or after the child was used.
+Someone holding only a stolen token lacks the key; someone who captured the whole request gets at most one
+replacement inside 30 s, and the real client's next refresh then trips reuse detection.
+
 ## Prerequisites
 
 Python ≥ 3.12 (tested on 3.13), [uv](https://docs.astral.sh/uv/), Docker with Compose v2.
@@ -189,7 +288,7 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm --n
 
 ```bash
 export ABU_DATABASE_URL="postgresql+psycopg://USER:PASS@127.0.0.1:5432/abu_ai"   # dev overlay port
-uv run alembic upgrade head   # 0001 registry · 0002 agents · 0003 auth+audit · 0004 agent versions
+uv run alembic upgrade head   # 0001 registry · 0002 agents · 0003 auth+audit · 0004 agent versions · 0005 governance
 uv run alembic downgrade base
 uv run alembic revision --autogenerate -m "describe change" --rev-id 0003
 ```
@@ -240,38 +339,46 @@ Each integration test gets a throwaway database built by the real migrations and
 
 ## Budget policy
 
-Paid models are **off by default**, no provider key is configured, and the router refuses any paid
-model. The ₹300/month ceiling, spending ledger and per-run/daily limits arrive in Milestone 4.
+Paid models are **off by default**, no provider key is configured and LiteLLM's only model is a mock.
+Monthly paid spend defaults to **INR 0** with an absolute ceiling of **INR 300** enforced by the ledger
+described above. LiteLLM's `max_budget: 0.01` USD is only a secondary gateway guard, not the budget
+controller.
 
 ## Roadmap
 
 1. ✅ Repository and infrastructure foundation
 2. ✅ Model Registry, Agent Registry foundations, provider abstraction, mock end-to-end flow
 3. ✅ Authentication and the Agent Registry (versions, permissions, limits, audit)
-4. Governance and cost control (the ₹300/month ledger) · 5. Memory · 6. Orchestrator
-7. Domain agents · 8. Mobile app · 9. Testing and deployment
+4. ✅ Governance and cost control (INR 300/month ledger, kill switch, execution records)
+5. Memory · 6. Orchestrator · 7. Domain agents · 8. Mobile app · 9. Testing and deployment
 
 ## Known issues and limitations
 
 - **No HTTP endpoint executes a model or tool.** The runtime is exercised at service level; the
-  orchestrator (Milestone 6) will expose it. Tool registry is empty; approvals are enforced and tested
-  but there is no approval-granting API yet.
+  orchestrator (Milestone 6) will expose it. The tool registry is empty; approvals are enforced and
+  tested but there is no approval-granting API yet.
+- **No paid provider has ever been called.** The spending machinery is verified with scripted fake
+  providers only. `gemini-3.1-flash-lite` availability and rate limits are unverified live.
+- **Paid spending is single-lane by design.** Every reservation takes one row lock, so paid calls are
+  serialised. Fine for one user; it is a throughput limit.
+- **Held amounts are deliberately conservative.** A timeout or unknown cost counts the full worst-case
+  reservation and freezes paid spending until the operator reconciles it (`spend resolve`, `spend unfreeze`).
+  That is manual by design: the operator must read the provider's invoice.
+- **A call is booked to the day/month it was reserved in**, even if it finishes after midnight.
+- **Cost trust:** confirmed cost relies on provider/gateway-reported usage or cost. A provider that
+  under-reports cannot be detected until reconciliation against an invoice.
+- **The USD→INR rate is operator-maintained** (stale after 14 days → paid refused). There is no live FX feed.
+- **The kill switch stops NEW work.** A model call already in flight when it is activated is allowed to
+  finish. There is no job queue yet; queued work is covered by the "start through `start_run`" contract.
+- **Data export** is listed as "must remain available" but no export feature exists yet.
 - **Rate limits are per process and in memory** (no Redis by design). Fine for one worker; scaling to
   several multiplies the effective limit. They reset on restart.
-- **Refresh tokens are bearer tokens.** Rotation + reuse detection limit the damage of theft, but they
-  are not bound to the device. Device binding (Apple App Attest / DPoP-style proof) is a future hardening
-  step; the iOS app must keep the refresh token in the Keychain (`ThisDeviceOnly`).
-- **Strict rotation can sign a legitimate client out** if a refresh response is lost in transit after
-  the server rotated: the retry looks like reuse and kills the session (re-enroll). This is the
-  deliberate security-over-convenience trade-off; a short grace window could be added later.
-- **HS256 (shared secret)** is used because one service both signs and verifies. Rotating
-  `JWT_SECRET` ends all sessions.
-- **Enrollment is a manual, operator-issued code.** There is no self-service signup (single-user by design).
-- The ₹ cost limit uses a conservative placeholder USD→INR rate (`ABU_USD_INR_RATE`, default 100); the
-  real ledger arrives in Milestone 4. No paid model is routable regardless.
-- Still not built: spending ledger, execution records, `model_versions`, `model_evaluations`.
-- No real provider has been called. `gemini-3.1-flash-lite` availability and rate limits are unverified
-  live; provider terms can change.
+- **Refresh tokens are bearer tokens, not device-bound.** Rotation, reuse detection and the one-shot
+  idempotent retry limit the damage of theft; device binding (App Attest / DPoP-style) is future work.
+  The iOS app must keep the refresh token in the Keychain (`ThisDeviceOnly`).
+- **HS256 shared secret:** rotating `JWT_SECRET` ends all sessions.
+- **Enrollment is a manual, operator-issued code** (single-user by design).
+- Still not built: `model_versions`, `model_evaluations`, memory, orchestrator, domain agents, mobile app.
 - Registry tables are system-level (no `user_id`); user-owned tables will carry one.
 - Starlette emits a deprecation warning about `httpx` in `TestClient`; harmless.
 - Building the API image inside this agent's sandbox needed a CA workaround for its egress proxy; the

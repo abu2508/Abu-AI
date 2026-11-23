@@ -9,6 +9,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.agent_registry import service as agents
+from core.governance.service import Governance
 from core.model_registry.errors import ApprovalError, NotFoundError, VersionStateError
 from core.permissions.errors import (
     AgentNotPermittedError,
@@ -158,12 +159,14 @@ async def test_database_allows_only_one_active_version(session: AsyncSession) ->
         )
 
 
-async def test_retiring_the_active_version_disables_the_agent(session: AsyncSession) -> None:
-    ctx = await runnable_agent(session)
+async def test_retiring_the_active_version_disables_the_agent(
+    session: AsyncSession, gov: Governance
+) -> None:
+    ctx = await runnable_agent(session, gov)
     await agents.retire_version(session, "finance_agent", 1)
     assert (await agents.get_agent(session, "finance_agent")).enabled is False
     with pytest.raises(AgentNotPermittedError):
-        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent")
+        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent", governance=gov)
 
 
 async def test_database_enforces_limit_ceilings(
@@ -251,28 +254,32 @@ async def test_versions_have_independent_permissions(session: AsyncSession) -> N
 # --- start_run: only enabled agents with an active version ------------------------------------------
 
 
-async def test_disabled_agent_cannot_start_a_run(session: AsyncSession) -> None:
-    ctx = await runnable_agent(session)
+async def test_disabled_agent_cannot_start_a_run(session: AsyncSession, gov: Governance) -> None:
+    ctx = await runnable_agent(session, gov)
     await agents.set_agent_enabled(session, "finance_agent", False)
     with pytest.raises(AgentNotPermittedError, match="disabled"):
-        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent")
+        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent", governance=gov)
 
 
-async def test_unknown_agent_and_unknown_or_disabled_user_refused(session: AsyncSession) -> None:
-    ctx = await runnable_agent(session)
+async def test_unknown_agent_and_unknown_or_disabled_user_refused(
+    session: AsyncSession, gov: Governance
+) -> None:
+    ctx = await runnable_agent(session, gov)
     with pytest.raises(AgentNotPermittedError):
-        await start_run(session, user_id=ctx.user_id, agent_id="ghost_agent")
+        await start_run(session, user_id=ctx.user_id, agent_id="ghost_agent", governance=gov)
     with pytest.raises(AgentNotPermittedError):
-        await start_run(session, user_id=uuid.uuid4(), agent_id="finance_agent")
+        await start_run(session, user_id=uuid.uuid4(), agent_id="finance_agent", governance=gov)
     user = await session.get(User, ctx.user_id)
     assert user is not None
     user.disabled_at = datetime.now(UTC)
     await session.flush()
     with pytest.raises(AgentNotPermittedError):
-        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent")
+        await start_run(session, user_id=ctx.user_id, agent_id="finance_agent", governance=gov)
 
 
-async def test_agent_with_enabled_flag_but_draft_only_cannot_run(session: AsyncSession) -> None:
+async def test_agent_with_enabled_flag_but_draft_only_cannot_run(
+    session: AsyncSession, gov: Governance
+) -> None:
     await seed_registry(session)
     await session.execute(
         text("UPDATE agents SET enabled = true WHERE agent_id = 'finance_agent'")
@@ -281,17 +288,17 @@ async def test_agent_with_enabled_flag_but_draft_only_cannot_run(session: AsyncS
     session.add(user)
     await session.flush()
     with pytest.raises(AgentNotPermittedError, match="no active version"):
-        await start_run(session, user_id=user.id, agent_id="finance_agent")
+        await start_run(session, user_id=user.id, agent_id="finance_agent", governance=gov)
 
 
 async def test_run_context_reflects_active_version_and_isolates_agents(
-    session: AsyncSession,
+    session: AsyncSession, gov: Governance
 ) -> None:
-    ctx = await runnable_agent(session, "finance_agent", (MOCK_ALIAS,))
+    ctx = await runnable_agent(session, gov, "finance_agent", (MOCK_ALIAS,))
     assert ctx.model_aliases == {MOCK_ALIAS} and ctx.version == 1
     # messaging_agent was seeded too but has no active version/permissions: it cannot borrow finance's.
     with pytest.raises(AgentNotPermittedError):
-        await start_run(session, user_id=ctx.user_id, agent_id="messaging_agent")
+        await start_run(session, user_id=ctx.user_id, agent_id="messaging_agent", governance=gov)
     with pytest.raises(PermissionDeniedError):
         ctx.authorize_memory("messaging_agent/anything")
 
@@ -299,7 +306,7 @@ async def test_run_context_reflects_active_version_and_isolates_agents(
 # --- tool executor ----------------------------------------------------------------------------------
 
 
-async def granted_ctx(session: AsyncSession) -> RunContext:
+async def granted_ctx(session: AsyncSession, gov: Governance) -> RunContext:
     await seed_registry(session)
     reg = tool_registry()
     for name, approval in (("lookup", False), ("save_note", True), ("slow_lookup", False)):
@@ -310,14 +317,15 @@ async def granted_ctx(session: AsyncSession) -> RunContext:
     user = User(display_name="t")
     session.add(user)
     await session.flush()
-    return await start_run(session, user_id=user.id, agent_id="finance_agent")
+    await session.commit()
+    return await start_run(session, user_id=user.id, agent_id="finance_agent", governance=gov)
 
 
 async def test_granted_read_tool_runs_with_validated_arguments(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     assert await ex.execute(ctx, "lookup", {"key": "k"}) == "found:k"
     assert "tool.executed" in await audit_types(sessions)
 
@@ -334,10 +342,10 @@ async def test_granted_read_tool_runs_with_validated_arguments(
     ],
 )
 async def test_tool_arguments_validated_against_schema(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], args: object
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], args: object, gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     before = len(calls)
     with pytest.raises(ToolValidationError):
         await ex.execute(ctx, "lookup", args)  # type: ignore[arg-type]
@@ -345,11 +353,11 @@ async def test_tool_arguments_validated_against_schema(
 
 
 async def test_oversized_arguments_rejected(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
+    ctx = await granted_ctx(session, gov)
     with pytest.raises(ToolValidationError, match="too large"):
-        await ToolExecutor(session, sessions, tool_registry()).execute(
+        await ToolExecutor(session, sessions, gov, tool_registry()).execute(
             ctx, "lookup", {"key": "x" * 20_000}
         )
 
@@ -358,28 +366,30 @@ async def test_oversized_arguments_rejected(
     "name", ["send_payment", "delete_all", "LOOKUP", "lookup ", "../lookup", ""]
 )
 async def test_ungranted_or_invented_tools_denied_and_audited_durably(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], name: str
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], name: str, gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
+    ctx = await granted_ctx(session, gov)
     with pytest.raises(PermissionDeniedError):
-        await ToolExecutor(session, sessions, tool_registry()).execute(ctx, name, {"key": "k"})
+        await ToolExecutor(session, sessions, gov, tool_registry()).execute(ctx, name, {"key": "k"})
     await session.rollback()  # the caller's transaction is gone ...
     assert "tool.denied" in await audit_types(sessions)  # ... the denial is still on record
 
 
 async def test_tool_granted_in_db_but_missing_from_code_fails_closed(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
+    ctx = await granted_ctx(session, gov)
     with pytest.raises(PermissionDeniedError, match="not available"):
-        await ToolExecutor(session, sessions, ToolRegistry()).execute(ctx, "lookup", {"key": "k"})
+        await ToolExecutor(session, sessions, gov, ToolRegistry()).execute(
+            ctx, "lookup", {"key": "k"}
+        )
 
 
 async def test_write_tool_needs_an_approval_bound_to_the_exact_arguments(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     args = {"note": "pay rent"}
     with pytest.raises(ApprovalRequiredError):
         await ex.execute(ctx, "save_note", args)
@@ -393,10 +403,10 @@ async def test_write_tool_needs_an_approval_bound_to_the_exact_arguments(
 
 
 async def test_approval_is_not_transferable(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     approval = await create_approval(session, ctx, "save_note", {"note": "n"})
     other_user = RunContext(**{**ctx.__dict__, "user_id": uuid.uuid4()})
     with pytest.raises(ApprovalRequiredError):
@@ -409,10 +419,10 @@ async def test_approval_is_not_transferable(
 
 
 async def test_expired_approval_rejected(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     approval = await create_approval(session, ctx, "save_note", {"note": "n"})
     row = await session.get(ToolApproval, approval)
     assert row is not None and row.expires_at - row.created_at <= timedelta(minutes=5, seconds=1)
@@ -422,23 +432,23 @@ async def test_expired_approval_rejected(
 
 
 async def test_tool_timeout_enforced(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
+    ctx = await granted_ctx(session, gov)
     ctx.limits = type(ctx.limits)(
         ctx.limits.max_steps, 1, 100, 100, ctx.limits.max_cost_inr
     )  # 1s budget
     with pytest.raises(LimitExceededError, match="timeout"):
-        await ToolExecutor(session, sessions, tool_registry()).execute(
+        await ToolExecutor(session, sessions, gov, tool_registry()).execute(
             ctx, "slow_lookup", {"key": "k"}
         )
 
 
 async def test_each_tool_call_counts_as_a_step(
-    session: AsyncSession, sessions: async_sessionmaker[AsyncSession]
+    session: AsyncSession, sessions: async_sessionmaker[AsyncSession], gov: Governance
 ) -> None:
-    ctx = await granted_ctx(session)
-    ex = ToolExecutor(session, sessions, tool_registry())
+    ctx = await granted_ctx(session, gov)
+    ex = ToolExecutor(session, sessions, gov, tool_registry())
     for _ in range(ctx.limits.max_steps):
         await ex.execute(ctx, "lookup", {"key": "k"})
     with pytest.raises(LimitExceededError, match="steps"):

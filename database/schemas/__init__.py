@@ -10,6 +10,14 @@ from database.schemas.agents import (
 )
 from database.schemas.auth import AuditEvent, AuthSession, EnrollmentCode, RefreshToken, User
 from database.schemas.base import Base
+from database.schemas.governance import (
+    ABSOLUTE_MONTHLY_CEILING_INR,
+    Execution,
+    ExecutionCall,
+    KillSwitchState,
+    SpendingConfig,
+    SpendLedger,
+)
 from database.schemas.registry import (
     ApprovalStatus,
     DataClass,
@@ -22,6 +30,12 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "ABSOLUTE_MONTHLY_CEILING_INR",
+    "Execution",
+    "ExecutionCall",
+    "KillSwitchState",
+    "SpendLedger",
+    "SpendingConfig",
     "Agent",
     "AgentVersion",
     "AgentVersionMemory",

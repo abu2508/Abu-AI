@@ -10,22 +10,34 @@ the server and database credentials, which no enrolled device ever holds.
   python -m services.admin version create|clone|activate|retire|show <agent_id> [<n>]
   python -m services.admin grant model|tool|memory <agent_id> <n> <value> [--mode read|read_write]
   python -m services.admin revoke model_alias|tool|memory <agent_id> <n> <value>
+  python -m services.admin kill-switch activate|deactivate --reason "..."   |   kill-switch status
+  python -m services.admin spend status
+  python -m services.admin spend set-budget --monthly 300 --daily 20   (hard ceiling: 300 INR/month)
+  python -m services.admin spend set-rate --rate 88.5 --source "RBI reference rate, 2026-11-23"
+  python -m services.admin spend paid on|off      (default off; needs a budget and a rate)
+  python -m services.admin spend unfreeze --reason "..."
+  python -m services.admin spend resolve <ledger-id> (--confirmed-inr 1.25 | --not-charged)
+  python -m services.admin executions list [--limit 20]
 """
 
 import argparse
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.agent_registry import service as agents
 from core.audit.service import ADMIN
+from core.governance import killswitch, spending
+from core.governance.errors import GovernanceError
+from core.governance.service import Governance
 from core.model_registry.errors import RegistryError
 from core.permissions.errors import PermissionDeniedError
 from core.permissions.tools import DEFAULT_TOOLS
-from database.schemas import Agent, MemoryMode
+from database.schemas import Agent, Execution, MemoryMode
 from services.api.auth import service as auth
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine
@@ -105,6 +117,57 @@ async def revoke(s: AsyncSession, _: Settings, a: argparse.Namespace) -> None:
     print("revoked")
 
 
+async def kill_switch_cmd(_: AsyncSession, __: Settings, a: argparse.Namespace) -> None:
+    if a.action == "activate":
+        snap = await killswitch.activate(a.factory, ADMIN, a.reason)
+    elif a.action == "deactivate":
+        snap = await killswitch.deactivate(a.factory, ADMIN, a.reason)
+    else:
+        snap = await killswitch.read_state(a.factory)
+    who = (
+        f"{snap.activated_by_type}/{snap.activated_via} at {snap.activated_at}"
+        if snap.active
+        else "-"
+    )
+    print(
+        f"kill switch: {'ACTIVE' if snap.active else 'inactive'}  by={who}  reason={snap.reason or '-'}"
+    )
+
+
+async def spend_cmd(_: AsyncSession, __: Settings, a: argparse.Namespace) -> None:
+    gov = Governance(a.factory)
+    if a.action == "set-budget":
+        await spending.set_budget(a.factory, ADMIN, Decimal(a.monthly), Decimal(a.daily))
+    elif a.action == "set-rate":
+        await spending.set_rate(a.factory, ADMIN, Decimal(a.rate), a.source)
+    elif a.action == "paid":
+        await spending.set_paid_models_enabled(a.factory, ADMIN, a.state == "on")
+    elif a.action == "unfreeze":
+        await spending.unfreeze(a.factory, ADMIN, a.reason)
+    elif a.action == "resolve":
+        amount = None if a.not_charged else Decimal(a.confirmed_inr)
+        await spending.resolve_held(a.factory, ADMIN, uuid.UUID(a.ledger_id), amount)
+    cfg, usage = await gov.spend.snapshot(), await gov.spend.usage()
+    print(
+        f"monthly={cfg.monthly_budget_inr} INR (ceiling 300)  daily={cfg.daily_budget_inr}  "
+        f"paid_models={'ON' if cfg.paid_models_enabled else 'off'}  frozen={cfg.paid_frozen}"
+        f"{' (' + (cfg.paid_frozen_reason or '') + ')' if cfg.paid_frozen else ''}\n"
+        f"rate={cfg.usd_inr_rate} INR/USD (source: {cfg.rate_source or '-'}, set {cfg.rate_set_at})\n"
+        f"used today={usage.day_used_inr}  this month={usage.month_used_inr}  of which held/unresolved={usage.held_inr}"
+    )
+
+
+async def executions_cmd(s: AsyncSession, _: Settings, a: argparse.Namespace) -> None:
+    rows = (
+        await s.execute(select(Execution).order_by(Execution.started_at.desc()).limit(a.limit))
+    ).scalars()
+    for r in rows:
+        print(
+            f"{r.id}  {r.status:14} {r.agent_id}:{r.agent_version}  {r.task_type}  calls={r.call_count}  "
+            f"confirmed={r.total_confirmed_cost_inr} INR  trace={r.trace_id}  reason={r.failure_reason or '-'}"
+        )
+
+
 def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     p = argparse.ArgumentParser(
         prog="services.admin", description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -143,6 +206,28 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     r.add_argument("agent_id")
     r.add_argument("number", type=int)
     r.add_argument("value")
+    ks = add("kill-switch", kill_switch_cmd)
+    ks.add_argument("action", choices=["activate", "deactivate", "status"])
+    ks.add_argument("--reason", default="")
+    sp = add("spend", spend_cmd)
+    sps = sp.add_subparsers(dest="action", required=True)
+    sps.add_parser("status")
+    b = sps.add_parser("set-budget")
+    b.add_argument("--monthly", required=True)
+    b.add_argument("--daily", required=True)
+    rt = sps.add_parser("set-rate")
+    rt.add_argument("--rate", required=True)
+    rt.add_argument("--source", required=True)
+    sps.add_parser("paid").add_argument("state", choices=["on", "off"])
+    sps.add_parser("unfreeze").add_argument("--reason", required=True)
+    rv = sps.add_parser("resolve")
+    rv.add_argument("ledger_id")
+    grp = rv.add_mutually_exclusive_group(required=True)
+    grp.add_argument("--confirmed-inr")
+    grp.add_argument("--not-charged", action="store_true")
+    ex = add("executions", executions_cmd)
+    ex.add_argument("action", choices=["list"])
+    ex.add_argument("--limit", type=int, default=20)
     return p, h
 
 
@@ -158,9 +243,18 @@ async def run(argv: list[str] | None = None) -> None:
         raise SystemExit("ABU_DATABASE_URL is not set")
     try:
         handler = handlers[args.cmd]
-        async with async_sessionmaker(engine)() as session, session.begin():
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        args.factory = factory  # governance commands manage their own transactions
+        async with factory() as session, session.begin():
             await handler(session, settings, args)
-    except (RegistryError, PermissionDeniedError, auth.NotFoundError, ValueError) as exc:
+    except (
+        RegistryError,
+        PermissionDeniedError,
+        GovernanceError,
+        auth.NotFoundError,
+        ValueError,
+        ArithmeticError,
+    ) as exc:
         # Expected operator mistakes: a clean message and a non-zero exit, not a traceback.
         raise SystemExit(f"error: {exc}") from None
     finally:

@@ -1,6 +1,5 @@
 """Environment-driven configuration. Secrets are SecretStr and never logged."""
 
-from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
@@ -41,10 +40,6 @@ class Settings(BaseSettings):
     rate_limit_auth_per_minute: int = Field(default=10, ge=1)
     rate_limit_ip_per_minute: int = Field(default=120, ge=1)
     rate_limit_user_per_minute: int = Field(default=300, ge=1)
-
-    # Conservative placeholder for converting USD prices to INR in per-run cost estimates.
-    # The Milestone 4 spending ledger owns real currency handling.
-    usd_inr_rate: Decimal = Decimal("100")
 
     @field_validator("jwt_secret", "token_hash_key")
     @classmethod

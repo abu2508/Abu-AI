@@ -23,6 +23,7 @@ from database.schemas import (
     ModelRoute,
     ProviderPolicy,
     RegisteredModel,
+    SpendingConfig,
     Tri,
 )
 
@@ -164,10 +165,12 @@ async def set_enabled(session: AsyncSession, name: str, enabled: bool) -> Regist
         if model.approval_status is not ApprovalStatus.APPROVED:
             raise ApprovalError(f"cannot enable {name!r}: model is not approved")
         if not is_free(model):
-            raise ApprovalError(
-                f"cannot enable {name!r}: paid models stay disabled until spending controls "
-                "exist (Milestone 4) and are explicitly opted in"
-            )
+            cfg = await session.get(SpendingConfig, 1)
+            if cfg is None or not cfg.paid_models_enabled or cfg.monthly_budget_inr <= 0:
+                raise ApprovalError(
+                    f"cannot enable {name!r}: it is a paid model and paid models are not opted in "
+                    "(an operator must set a budget and enable paid models first)"
+                )
     model.enabled = enabled
     await session.flush()
     return model
