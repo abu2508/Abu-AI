@@ -1,0 +1,43 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*.json
+
+# Real user data — never commit
+*.pdf
+*.xlsx
+*.xls
+*.csv
+!tests/fixtures/**
+data/
+backups/
+*.dump
+*.sql.gz
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Docker / OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.log
+infrastructure/caddy/data/

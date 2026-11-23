@@ -1,0 +1,83 @@
+# Run from repo root:
+#   docker compose --env-file .env -f infrastructure/docker-compose.yml up -d --build
+name: abu-ai
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set in .env}
+      POSTGRES_DB: postgres
+      APP_DB_NAME: ${APP_DB_NAME:?set in .env}
+      APP_DB_USER: ${APP_DB_USER:?set in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set in .env}
+      LITELLM_DB_NAME: ${LITELLM_DB_NAME:?set in .env}
+      LITELLM_DB_USER: ${LITELLM_DB_USER:?set in .env}
+      LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    healthcheck:
+      # Healthy only once the server accepts connections AND pgvector exists in the app DB.
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$APP_DB_NAME -tAc \"SELECT 1 FROM pg_extension WHERE extname='vector'\" | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks: [data]
+    # No published ports: PostgreSQL is reachable only on the private "data" network.
+
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.83.14-stable.patch.3
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set in .env}
+      DATABASE_URL: postgresql://${LITELLM_DB_USER}:${LITELLM_DB_PASSWORD}@db:5432/${LITELLM_DB_NAME}
+      DISABLE_ADMIN_UI: "True"
+      # No provider keys are passed through. Add them only after explicit opt-in.
+    volumes:
+      - ../services/litellm/config.yaml:/app/config.yaml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    # "data" for DB + API access; "egress" only so it can reach model providers later.
+    networks: [data, egress]
+
+  api:
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      ABU_ENV: ${ABU_ENV:-development}
+      ABU_DATABASE_URL: postgresql+asyncpg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+      ABU_LITELLM_BASE_URL: http://litellm:4000
+    ports:
+      # Loopback only. Public access goes through Caddy (Milestone 9).
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    networks: [data, edge]
+
+volumes:
+  pgdata:
+
+networks:
+  # internal: containers on this network have no route to the internet.
+  data:
+    internal: true
+  egress: {}
+  edge: {}

@@ -1,0 +1,15 @@
+# Development-only overlay: exposes PostgreSQL and LiteLLM on loopback for host-side tests.
+#   docker compose --env-file .env -f infrastructure/docker-compose.yml \
+#     -f infrastructure/docker-compose.dev.yml up -d
+# Never use this file on the VPS.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks: [data, devaccess]
+  litellm:
+    ports:
+      - "127.0.0.1:4000:4000"
+
+networks:
+  devaccess: {}
