@@ -54,11 +54,51 @@ from core.memory.types import (
 )
 from core.permissions.errors import PermissionDeniedError
 from database.schemas import (
+    CoachCheckin,
+    CoachEvent,
+    CoachGoal,
+    CoachHabit,
+    CoachHabitLog,
+    CoachReminder,
+    CoachSettings,
+    CoachTask,
     DataClass,
+    FinAccount,
+    FinBudget,
+    FinImportBatch,
+    FinLoan,
+    FinMerchantRule,
+    FinSubscription,
+    FinTransaction,
     MemoryAccessLog,
     MemoryEmbedding,
     MemoryRecord,
+    MsgContact,
+    MsgConversation,
+    MsgMessage,
     OrchestratorRun,
+)
+
+# Every user-owned domain table, children before parents (erasure must leave nothing behind).
+DOMAIN_ERASURE_ORDER: tuple[Any, ...] = (
+    FinTransaction,
+    FinImportBatch,
+    FinMerchantRule,
+    FinBudget,
+    FinSubscription,
+    FinLoan,
+    FinAccount,
+    MsgMessage,
+    MsgConversation,
+    MsgContact,
+    CoachReminder,
+    CoachCheckin,
+    CoachHabitLog,
+    CoachHabit,
+    CoachEvent,
+    CoachTask,
+    CoachGoal,
+    CoachSettings,
 )
 
 _SENSITIVE_TOPICS = (
@@ -1037,6 +1077,9 @@ class MemoryService:
         await self._s.execute(
             delete(OrchestratorRun).where(OrchestratorRun.user_id == caller.user_id)
         )
+        # ... and so do the user's domain records (finance, messaging, coach): erasure means ALL of it.
+        for model in DOMAIN_ERASURE_ORDER:
+            await self._s.execute(delete(model).where(model.user_id == caller.user_id))
         await record_event(
             self._s,
             _actor(caller),

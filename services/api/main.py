@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from core.governance.service import Governance
 from core.memory.runtime import build_keyring, open_runtime, verify_embedding_dimension
 from core.orchestrator.orchestrator import Orchestrator
-from services.api import agents, finance, governance, health, memory, messaging, orchestrator
+from services.api import agents, coach, finance, governance, health, memory, messaging, orchestrator
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine, create_sessionmaker
@@ -76,6 +76,7 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.include_router(orchestrator.router)
     app.include_router(finance.router)
     app.include_router(messaging.router)
+    app.include_router(coach.router)
 
     # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
     app.add_middleware(

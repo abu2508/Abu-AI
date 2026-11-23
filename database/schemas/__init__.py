@@ -10,6 +10,16 @@ from database.schemas.agents import (
 )
 from database.schemas.auth import AuditEvent, AuthSession, EnrollmentCode, RefreshToken, User
 from database.schemas.base import Base
+from database.schemas.coach import (
+    CoachCheckin,
+    CoachEvent,
+    CoachGoal,
+    CoachHabit,
+    CoachHabitLog,
+    CoachReminder,
+    CoachSettings,
+    CoachTask,
+)
 from database.schemas.finance import (
     FinAccount,
     FinBudget,
@@ -48,6 +58,14 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "CoachCheckin",
+    "CoachEvent",
+    "CoachGoal",
+    "CoachHabit",
+    "CoachHabitLog",
+    "CoachReminder",
+    "CoachSettings",
+    "CoachTask",
     "MsgContact",
     "MsgConversation",
     "MsgMessage",

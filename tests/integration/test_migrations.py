@@ -47,7 +47,19 @@ FINANCE = {
     "fin_budgets",
 }
 MESSAGING = {"msg_contacts", "msg_conversations", "msg_messages"}
-HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY | ORCHESTRATOR | FINANCE | MESSAGING
+COACH = {
+    "coach_settings",
+    "coach_goals",
+    "coach_tasks",
+    "coach_habits",
+    "coach_habit_logs",
+    "coach_events",
+    "coach_reminders",
+    "coach_checkins",
+}
+HEAD = (
+    REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY | ORCHESTRATOR | FINANCE | MESSAGING | COACH
+)
 
 
 def tables(url: URL) -> set[str]:
@@ -115,14 +127,17 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
             is True
         )
 
-    command.downgrade(cfg, "0008")  # drops only the messaging tables
-    assert tables(url) == HEAD - MESSAGING
+    command.downgrade(cfg, "0009")  # drops only the coach tables
+    assert tables(url) == HEAD - COACH
     command.upgrade(cfg, "head")
-    command.downgrade(cfg, "0007")  # drops the finance and messaging tables
-    assert tables(url) == HEAD - FINANCE - MESSAGING
+    command.downgrade(cfg, "0008")  # drops messaging and coach
+    assert tables(url) == HEAD - MESSAGING - COACH
     command.upgrade(cfg, "head")
-    command.downgrade(cfg, "0006")  # drops orchestrator_runs, finance and messaging
-    assert tables(url) == HEAD - ORCHESTRATOR - FINANCE - MESSAGING
+    command.downgrade(cfg, "0007")  # drops finance, messaging and coach
+    assert tables(url) == HEAD - FINANCE - MESSAGING - COACH
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "0006")  # drops orchestrator_runs and all domain tables
+    assert tables(url) == HEAD - ORCHESTRATOR - FINANCE - MESSAGING - COACH
     command.upgrade(cfg, "head")
     command.downgrade(
         cfg, "0005"
