@@ -18,6 +18,8 @@ the server and database credentials, which no enrolled device ever holds.
   python -m services.admin spend unfreeze --reason "..."
   python -m services.admin spend resolve <ledger-id> (--confirmed-inr 1.25 | --not-charged)
   python -m services.admin executions list [--limit 20]
+  python -m services.admin orchestrator bootstrap-mock [--user-memory finance_agent,...]   (grant mock alias + own memory, activate, enable)
+  python -m services.admin orchestrator purge                (scrub expired idempotent replies; delete old run history)
   python -m services.admin memory stats
   python -m services.admin memory purge-expired            (retention: proposals, third-party summaries, threads...)
   python -m services.admin memory add-key --file KEYRING --id k2   (HOST command: adds+activates a new master key)
@@ -44,6 +46,8 @@ from core.memory.crypto import KeyRing
 from core.memory.runtime import open_runtime
 from core.memory.types import Caller
 from core.model_registry.errors import RegistryError
+from core.orchestrator.bootstrap import bootstrap_mock_agents
+from core.orchestrator.idempotency import RunStore
 from core.permissions.errors import PermissionDeniedError
 from core.permissions.tools import DEFAULT_TOOLS
 from database.schemas import Agent, Execution, MemoryMode
@@ -177,6 +181,23 @@ async def executions_cmd(s: AsyncSession, _: Settings, a: argparse.Namespace) ->
         )
 
 
+async def orchestrator_cmd(s: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
+    if a.action == "bootstrap-mock":
+        grants = [x for x in (a.user_memory or "").split(",") if x]
+        result = await bootstrap_mock_agents(s, ADMIN, user_memory_for=grants)
+        for agent_id, outcome in result.items():
+            print(f"{agent_id}: {outcome} (mock model only; no external provider)")
+    elif a.action == "purge":
+        runtime = await open_runtime(cfg, with_checkpointer=False)
+        if cfg.token_hash_key is None:  # unreachable: require_auth_secrets() ran
+            raise SystemExit("token hash key is not configured")
+        store = RunStore(
+            a.factory, runtime.envelope, cfg.token_hash_key, cfg.orchestrator_response_ttl_hours
+        )
+        print("scrubbed replies:", await store.scrub_expired())
+        print("deleted runs:", await store.purge(cfg.orchestrator_run_retention_days))
+
+
 async def memory_cmd(_: AsyncSession, cfg: Settings, a: argparse.Namespace) -> None:
     runtime = await open_runtime(cfg)
     try:
@@ -294,6 +315,11 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     mem.add_argument("--confirm")
     mem.add_argument("--file")
     mem.add_argument("--id")
+    orc = add("orchestrator", orchestrator_cmd)
+    orc.add_argument("action", choices=["bootstrap-mock", "purge"])
+    orc.add_argument(
+        "--user-memory", help="comma-separated agent ids to grant READ on the user/ namespace"
+    )
     ex = add("executions", executions_cmd)
     ex.add_argument("action", choices=["list"])
     ex.add_argument("--limit", type=int, default=20)

@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     retention_episodic_days: int = Field(default=180, ge=1, le=3650)
     retention_superseded_days: int = Field(default=30, ge=1, le=3650)
     retention_thread_days: int = Field(default=7, ge=1, le=365)
+    # Orchestrator: how long an idempotent response can be replayed (encrypted), and how long run metadata is kept.
+    orchestrator_response_ttl_hours: int = Field(default=24, ge=1, le=168)
+    orchestrator_run_retention_days: int = Field(default=30, ge=1, le=365)
 
     @field_validator("jwt_secret", "token_hash_key")
     @classmethod

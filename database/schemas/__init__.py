@@ -25,6 +25,7 @@ from database.schemas.memory import (
     MemoryEmbedding,
     MemoryRecord,
 )
+from database.schemas.orchestrator import OrchestratorRun
 from database.schemas.registry import (
     ApprovalStatus,
     DataClass,
@@ -37,6 +38,7 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "OrchestratorRun",
     "EMBEDDING_DIM",
     "AgentThread",
     "MemoryAccessLog",

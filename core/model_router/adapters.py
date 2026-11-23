@@ -7,6 +7,7 @@ from typing import Protocol
 import httpx
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from core.model_router import contract
 from core.model_router.router import ResolvedModel
 from core.model_router.types import CompletionRequest, CompletionResult
 
@@ -35,7 +36,13 @@ class MockAdapter:
 
     async def complete(self, model: ResolvedModel, request: CompletionRequest) -> CompletionResult:
         start = time.perf_counter()
-        text = f"[mock:{model.name}] received {len(request.messages)} message(s)"
+        first = request.messages[0]
+        if first.role == "system" and contract.is_contract_request(first.content):
+            text = contract.mock_contract_reply(
+                first.content
+            )  # structured-output mode (orchestrator)
+        else:
+            text = f"[mock:{model.name}] received {len(request.messages)} message(s)"
         in_tokens = sum(len(m.content) for m in request.messages) // 4 + 1
         return CompletionResult(
             text=text,

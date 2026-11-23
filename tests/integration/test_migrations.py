@@ -36,7 +36,8 @@ GOVERNANCE = {
     "spend_ledger",
 }
 MEMORY = {"memory_records", "memory_embeddings", "memory_access_logs", "agent_threads"}
-HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY
+ORCHESTRATOR = {"orchestrator_runs"}
+HEAD = REGISTRY | AUTH | AGENTS_HEAD | GOVERNANCE | MEMORY | ORCHESTRATOR
 
 
 def tables(url: URL) -> set[str]:
@@ -104,6 +105,9 @@ def test_stepwise_upgrade_preserves_data_and_downgrades(scratch_db: Callable[[],
             is True
         )
 
+    command.downgrade(cfg, "0006")  # drops only orchestrator_runs
+    assert tables(url) == HEAD - ORCHESTRATOR
+    command.upgrade(cfg, "head")
     command.downgrade(
         cfg, "0005"
     )  # drops the memory tables (no checkpoint data exists, so RESTRICT is satisfied)

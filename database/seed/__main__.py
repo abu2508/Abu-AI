@@ -4,6 +4,7 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from database.seed.orchestrator import seed_orchestrator
 from database.seed.registry import seed_registry
 from services.api.config import get_settings
 from services.api.db import create_engine
@@ -16,6 +17,7 @@ async def main() -> None:
     try:
         async with async_sessionmaker(engine)() as session, session.begin():
             await seed_registry(session)
+            await seed_orchestrator(session)
     finally:
         await engine.dispose()
     print("registry seeded")

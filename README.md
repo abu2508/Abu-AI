@@ -342,6 +342,84 @@ Deleted rows physically remain in PostgreSQL until vacuum, and in older backups 
 threads) is the user's Memory Manager. Operator: `memory stats | purge-expired | add-key | rotate-keys | reembed |
 erase-user`.
 
+## Orchestrator (Milestone 6) - mock workflows only
+
+The orchestrator is the single, governed entry point from a user request to an agent. **Every workflow is
+a mock**: it runs the real pipeline (classification, routing, permissions, memory, spending, validation,
+audit) against the in-process mock model and returns a placeholder reply labelled `mock: true`. No
+finance, messaging or coaching functionality exists yet, and no external model provider is wired in
+(`Orchestrator` composes only `MockAdapter`; a test blocks every non-loopback connection).
+
+```
+POST /v1/orchestrator/run   {"message": "..."}  + Authorization: Bearer ..  [+ Idempotency-Key: 16-128 chars]
+GET  /v1/orchestrator/runs[?limit&before]        own run history (metadata only)
+GET  /v1/orchestrator/runs/{id}                  own run status (+ reply while its encrypted copy has not expired)
+GET  /v1/orchestrator/workflows                  registered workflows and their bounds
+```
+
+**Identity.** The execution identity is the authenticated user; the body has no user field and extra
+fields are rejected (422). Another user's run id is a 404.
+
+**Pipeline** (`core/orchestrator/graph.py`, LangGraph, compiled *without* a checkpointer so nothing is
+saved automatically): classify -> select agent -> govern (`start_run`: kill switch, agent registry,
+active version, execution record; model-alias permission) -> assemble context -> execute <-> validate
+(bounded retry) -> remember (proposals only) -> respond; any handled failure goes to `fail`.
+
+| Intent | Agent | Notes |
+|---|---|---|
+| finance / messaging / coaching | `finance_agent` / `messaging_agent` / `daily_coach_agent` | mock workflow |
+| general | `general_agent` (new front-desk agent, seeded disabled) | mock workflow |
+| ambiguous, clarification needed | `general_agent` | static clarification question, no model call |
+| unsupported (payments, auto-send, governance bypass, other users) | `general_agent` | static refusal, no model call |
+
+The classifier is deterministic and rule-based behind a `Classifier` protocol and can only return an
+`Intent` enum, so neither user text nor a future model-based classifier can name an agent, model or tool.
+Text such as "use the finance_agent" is flagged and ignored.
+
+**Bounds per workflow** (`WorkflowSpec`): max graph steps, timeout, retries (provider errors and
+malformed output only; governance refusals are never retried), max memory proposals, context budget,
+model alias, readable and writable memory roots, and an empty tool allowlist (the registry refuses
+tools). The agent version's own limits (steps, tokens, cost, time) and the spending controller apply on top.
+
+**Memory.** Only the workflow's own agent namespace, plus `user` only if the agent version was explicitly
+granted it, is read; another agent's namespace or another user's memory is unreachable. Retrieved memory
+is passed as quoted untrusted data. Model-proposed memories go through `MemoryService.propose` with a
+forced `agent_inference` source, only into the agent's own namespace, capped per run; sensitive ones need
+the user's approval. Conversations are not saved.
+
+**Idempotency.** With an `Idempotency-Key`, a repeat returns the stored reply (`replayed: true`); the same
+key with a different body is 409; a concurrent duplicate is 409; a failed run can be retried under the
+key. The request is stored only as a keyed hash, the reply is envelope-encrypted and scrubbed after
+`ORCHESTRATOR_RESPONSE_TTL_HOURS` (24h). Without a key no reply is stored at all.
+
+**Kill switch.** Checked at the entry (before anything is claimed or replayed), again in `start_run`, and
+before every model call. Covered for the HTTP route, `run_user_request`, `run_scheduled_task`, replays
+and mid-run activation. `run_scheduled_task` takes a fixed enum, never free text.
+
+Operator setup (agents are registered disabled; nothing runs until this is done):
+
+```bash
+docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm admin orchestrator bootstrap-mock
+docker compose --env-file .env -f infrastructure/docker-compose.yml run --rm admin orchestrator purge   # scrub expired replies, delete old runs
+```
+
+### Deployment security gates (tracked, not yet satisfied)
+
+Do **not** use real personal, financial or messaging data until every gate is satisfied.
+`infrastructure/scripts/security-gates.sh` prints `BLOCKED` for each until the operator acknowledges it.
+
+| Gate | Status |
+|---|---|
+| Disk and Docker-volume encryption verified for Postgres and backups | **not verified** |
+| Independent keyring backup + rehearsed recovery (losing the keyring makes memory unrecoverable) | **not done** |
+| LangGraph checkpoint metadata is plaintext (content is encrypted) | **open** (accept or remove) |
+| Production embedding provider approved (only the deterministic test embedder exists) | **none** |
+
+Other Milestone 6 limits: the rule-based classifier is brittle (unusual phrasing, English only, no
+conversational context; misses degrade to clarification/general, never to an action); the mock model
+proves orchestration, not answer quality; `general_agent` is a fourth agent beyond the three mandatory
+ones; the 24 h reply cache is the only place a reply is persisted and only when a key is sent.
+
 ## Prerequisites
 
 Python ≥ 3.12 (tested on 3.13), [uv](https://docs.astral.sh/uv/), Docker with Compose v2.
@@ -457,8 +535,7 @@ controller.
   host) can read it. A KMS/HSM `KeyProvider` is a drop-in later.
 - Messaging tables (`people`, `conversations`, …) are not built; this milestone provides the privacy layer they
   will use.
-- **No HTTP endpoint executes a model or tool.** The runtime is exercised at service level; the
-  orchestrator (Milestone 6) will expose it. The tool registry is empty; approvals are enforced and
+- **Only the orchestrator endpoint executes a model (mock only); no endpoint executes a tool.** The tool registry is empty; approvals are enforced and
   tested but there is no approval-granting API yet.
 - **No paid provider has ever been called.** The spending machinery is verified with scripted fake
   providers only. `gemini-3.1-flash-lite` availability and rate limits are unverified live.
@@ -481,7 +558,7 @@ controller.
   The iOS app must keep the refresh token in the Keychain (`ThisDeviceOnly`).
 - **HS256 shared secret:** rotating `JWT_SECRET` ends all sessions.
 - **Enrollment is a manual, operator-issued code** (single-user by design).
-- Still not built: `model_versions`, `model_evaluations`, memory, orchestrator, domain agents, mobile app.
+- Still not built: `model_versions`, `model_evaluations`, domain agents, mobile app. The orchestrator exists but runs mock workflows only.
 - Registry tables are system-level (no `user_id`); user-owned tables will carry one.
 - Starlette emits a deprecation warning about `httpx` in `TestClient`; harmless.
 - Building the API image inside this agent's sandbox needed a CA workaround for its egress proxy; the

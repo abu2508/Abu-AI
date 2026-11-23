@@ -53,7 +53,13 @@ from core.memory.types import (
     ProposalResult,
 )
 from core.permissions.errors import PermissionDeniedError
-from database.schemas import DataClass, MemoryAccessLog, MemoryEmbedding, MemoryRecord
+from database.schemas import (
+    DataClass,
+    MemoryAccessLog,
+    MemoryEmbedding,
+    MemoryRecord,
+    OrchestratorRun,
+)
 
 _SENSITIVE_TOPICS = (
     r"\b(password|passcode|pin|otp|salary|income|loan|debt|credit|account|balance|ssn|aadhaar|pan|passport|"
@@ -1020,6 +1026,10 @@ class MemoryService:
                 delete(MemoryAccessLog).where(MemoryAccessLog.user_id == caller.user_id)
             )
         ).rowcount  # type: ignore[attr-defined]
+        # Orchestrator run history (metadata + any encrypted idempotent replies) goes with the rest.
+        await self._s.execute(
+            delete(OrchestratorRun).where(OrchestratorRun.user_id == caller.user_id)
+        )
         await record_event(
             self._s,
             _actor(caller),
