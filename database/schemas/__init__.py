@@ -34,6 +34,7 @@ from database.schemas.memory import (
     MemoryEmbedding,
     MemoryRecord,
 )
+from database.schemas.messaging import MsgContact, MsgConversation, MsgMessage
 from database.schemas.orchestrator import OrchestratorRun
 from database.schemas.registry import (
     ApprovalStatus,
@@ -47,6 +48,9 @@ from database.schemas.registry import (
 )
 
 __all__ = [
+    "MsgContact",
+    "MsgConversation",
+    "MsgMessage",
     "FinAccount",
     "FinBudget",
     "FinImportBatch",

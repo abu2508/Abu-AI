@@ -1,6 +1,7 @@
 """Pure-ASGI middleware: request-size limit, IP rate limit, response hardening headers."""
 
 import json
+import re
 from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -48,15 +49,15 @@ class BodySizeLimitMiddleware:
     def __init__(
         self, app: ASGIApp, max_bytes: int, path_limits: dict[str, int] | None = None
     ) -> None:
-        self.app, self.default, self.limits = app, max_bytes, path_limits or {}
+        """`path_limits` maps a FULL-MATCH regex of the request path to a larger byte limit (file/chat imports)."""
+        self.app, self.default = app, max_bytes
+        self.limits = [(re.compile(rx), n) for rx, n in (path_limits or {}).items()]
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        limit = self.limits.get(
-            scope["path"], self.default
-        )  # exact-path overrides (file imports only)
+        limit = next((n for rx, n in self.limits if rx.fullmatch(scope["path"])), self.default)
         for name, value in scope["headers"]:
             if name == b"content-length":
                 try:
