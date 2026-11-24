@@ -10,6 +10,8 @@ const SECRET_PATTERNS = [
   [/\bxox[baprs]-[A-Za-z0-9-]{10,}/, 'Slack token'],
   [/\bsk-[A-Za-z0-9]{20,}/, 'API secret key'],
   [/\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, 'JWT'],
+  [/\brt_[A-Za-z0-9_-]{20,}/, 'backend refresh-token shape'],
+  [/\benr_[A-Za-z0-9_-]{16,}/, 'backend enrollment-code shape'],
   [/:\/\/[^/\s:@]+:[^/\s@]+@/, 'URL with embedded credentials'],
   [/\b(?:api[_-]?key|secret|passwd|password|token)\b\s*[:=]\s*['"][A-Za-z0-9+/_-]{16,}['"]/i, 'hard-coded credential'],
 ];
@@ -48,7 +50,15 @@ const scan = (file, patterns, label) => {
 };
 for (const dir of ['src', 'app', 'tests', 'scripts', 'assets'])
   for (const f of walk(dir)) scan(f, SECRET_PATTERNS, 'secret');
-for (const f of ['app.json', 'package.json', 'eslint.config.mjs', 'jest.config.js', 'jest.setup.ts', '.npmrc'])
+for (const f of [
+  'app.json',
+  'app.config.js',
+  'package.json',
+  'eslint.config.mjs',
+  'jest.config.js',
+  'jest.setup.ts',
+  '.npmrc',
+])
   scan(f, SECRET_PATTERNS, 'secret');
 for (const f of walk('src/testing')) scan(f, REAL_DATA_PATTERNS, 'real-looking data');
 try {

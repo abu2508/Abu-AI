@@ -61,3 +61,6 @@ Only three packages in the tree have install-time scripts:
 - The scanners are specified (licence allowlist, install-script allowlist, `npm audit` gate with the dev-tooling ratchet) and become M8.0 deliverables.
 - **Installation is incremental** (see DEPENDENCY_REGISTER section 8): M8.0 installs only what it needs; each later milestone installs its own packages after the same audit.
 - Everything above should be re-run against the real lockfile at M8.0 before the first install is committed; results go into the M8.0 test report.
+
+## M8.1 addendum
+The seven new runtime packages add no vulnerabilities: `npm audit` is unchanged at 20 moderate (all pre-existing Node-side tooling), 0 high, 0 critical. None of the new packages has an install script. The ratchet stays at 20.

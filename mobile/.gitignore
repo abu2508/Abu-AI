@@ -6,3 +6,5 @@ web-build/
 *.log
 .DS_Store
 screenshots/tmp/
+.contract.env
+.contract-api.log

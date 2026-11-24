@@ -71,3 +71,48 @@ export function DemoBanner() {
     </View>
   );
 }
+
+/** Shown whenever a development backend is connected, so it can never be mistaken for demo mode. */
+export function ConnectionChip({ label }: { label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Connected to development backend ${label}. Synthetic data only.`}
+      style={{
+        backgroundColor: colors.infoSoft,
+        borderColor: colors.info,
+        borderWidth: 1,
+        borderRadius: radius.pill,
+        paddingHorizontal: space.sm,
+        paddingVertical: 2,
+      }}
+    >
+      <Text variant="caption" style={{ color: colors.info, fontWeight: '700' }}>
+        Dev backend · {label}
+      </Text>
+    </View>
+  );
+}
+
+export function OfflineChip() {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel="You are offline. Nothing will be sent."
+      style={{
+        backgroundColor: colors.dangerSoft,
+        borderColor: colors.danger,
+        borderWidth: 1,
+        borderRadius: radius.pill,
+        paddingHorizontal: space.sm,
+        paddingVertical: 2,
+      }}
+    >
+      <Text variant="caption" tone="danger" style={{ fontWeight: '700' }}>
+        Offline
+      </Text>
+    </View>
+  );
+}

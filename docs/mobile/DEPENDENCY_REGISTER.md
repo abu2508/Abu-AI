@@ -131,3 +131,18 @@ Each milestone re-runs the audit/licence/install-script scan on the real lockfil
 - **AsyncStorage 2.x vs upstream 3.x:** staying on the SDK-bundled line is intentional.
 - **Licences:** every direct dependency listed is MIT or Apache-2.0 (TypeScript and Playwright are Apache-2.0). Transitive licences are scanned in M8.0; anything outside the allowlist blocks CI until approved.
 - **Maintenance:** the pinned versions were all published within the last ~12 months except AsyncStorage 2.2.0 (Jun 2025; upstream has newer releases) and the stale a11y lint plugin; none is deprecated on npm.
+
+## M8.1 installation record (2026-11-24)
+Installed exactly pinned (`--save-exact`, `ignore-scripts=true`), lockfile committed. Gates after install: SDK alignment OK (28 direct deps), licence gate OK (1,407 packages, 14 documented exceptions), install-script gate OK (still only `@parcel/watcher` and `fsevents`, never run), audit 0 critical / 0 high / **20 moderate (unchanged, ratchet 20)**, secret scan OK.
+
+| Package | Version | Licence | Install scripts | Why |
+|---|---|---|---|---|
+| `zod` | 4.6.7 | MIT | none | validate every API response (`src/api/schemas`) and the stored credential record |
+| `zustand` | 5.1.0 | MIT | none | authentication **status** only (never tokens) |
+| `@tanstack/react-query` | 5.108.4 | MIT | none | in-memory, user-scoped, short-gc cache; no persister |
+| `expo-secure-store` | 57.0.4 | MIT | none | Keychain, `WHEN_UNLOCKED_THIS_DEVICE_ONLY` (imported in one file only, lint-enforced) |
+| `expo-network` | 57.0.3 | MIT | none | connectivity (decision D4). **Not in the original register; added with the M8.1 plan approval (D4).** |
+| `expo-device` | 57.0.2 | MIT | none | default device name from the model (decision D6). **Not in the original register; added with D6.** |
+| `expo-crypto` | 57.0.4 | MIT | none | **Deviation, needs your acknowledgement:** not in the approved list. React Native/Hermes has no `crypto.getRandomValues`/`subtle`, and the refinements require a cryptographically secure 128-bit Idempotency-Key and a token fingerprint. First-party SDK package, no install script, no new transitive packages of note. Alternative would have been a hand-written PRNG, which I judged unacceptable. |
+| ~~`msw`~~ | not installed | | | planned, but an injected `Transport` fake (`tests/support/fakeBackend.ts`) was simpler and stricter; removed again to keep the tree small |
+| ~~`expo-local-authentication`~~, ~~`expo-camera`~~ | not installed | | | deferred (D2 and D3) |

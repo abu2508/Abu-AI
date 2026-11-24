@@ -45,6 +45,8 @@ describe.each([
   '/settings',
   '/settings/appearance',
   '/settings/about',
+  '/settings/connection',
+  '/settings/sessions',
 ])('accessibility of %s', (url) => {
   it('has named interactive controls with adequate touch targets', async () => {
     await renderRouter(APP, { initialUrl: url });

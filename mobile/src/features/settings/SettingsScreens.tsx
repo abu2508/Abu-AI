@@ -15,11 +15,13 @@ import {
 } from '@/design';
 import { GATES } from '@/config/gates';
 import type { AppearancePreference } from '@/prefs/appearance';
+import { ConnectionScreen, SessionsScreen } from './ConnectionScreens';
 
 export const SETTINGS_SECTIONS = [
   { slug: 'appearance', title: 'Appearance', subtitle: 'System, Light or Dark', ready: true },
   { slug: 'security', title: 'Security', subtitle: 'App lock and privacy', ready: false },
-  { slug: 'sessions', title: 'Devices and sessions', subtitle: 'Where Abu is signed in', ready: false },
+  { slug: 'connection', title: 'Development connection', subtitle: 'Demo mode, enrol, sign out', ready: true },
+  { slug: 'sessions', title: 'Devices and sessions', subtitle: 'Where Abu is signed in', ready: true },
   { slug: 'memory', title: 'Memory', subtitle: 'What Abu remembers, proposals', ready: false },
   { slug: 'governance', title: 'Governance', subtitle: 'Emergency stop and limits', ready: false },
   { slug: 'agents', title: 'Agents', subtitle: 'Finance, Messaging, Coach', ready: false },
@@ -79,8 +81,9 @@ export function AboutScreen() {
     <Screen>
       <SyntheticChip />
       <Banner tone="warning" title="Synthetic data only">
-        This build runs in offline demo mode with invented data and a mock model. It makes no network requests and holds
-        no credentials.
+        This build shows invented data and a mock model. Demo mode makes no network requests. You can optionally connect
+        to an operator-approved development backend (Settings, Development connection); the refresh token then lives in
+        the iOS Keychain only.
       </Banner>
       <Text variant="title3">Production security gates</Text>
       <Card>
@@ -96,7 +99,7 @@ export function AboutScreen() {
         ))}
       </Card>
       <Text variant="footnote" tone="secondary">
-        Version 0.1.0 (M8.0 foundation)
+        Version 0.1.0 (M8.1 authentication foundation)
       </Text>
     </Screen>
   );
@@ -113,6 +116,8 @@ export function SettingsSectionScreen() {
     );
   if (section === 'appearance') return <AppearanceScreen />;
   if (section === 'about') return <AboutScreen />;
+  if (section === 'connection') return <ConnectionScreen />;
+  if (section === 'sessions') return <SessionsScreen />;
   return (
     <Screen>
       <EmptyState

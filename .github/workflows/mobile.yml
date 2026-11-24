@@ -36,7 +36,7 @@ jobs:
           npm run typecheck
           npm run lint
           npm run format:check
-          npm test
+          npm run test:coverage
       - name: Generated API types match the committed OpenAPI snapshot
         run: npm run api:types:check
       - name: Supply-chain gates (licences, install scripts, vulnerabilities)

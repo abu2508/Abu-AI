@@ -48,6 +48,7 @@ export default defineConfig([
     rules: { 'no-restricted-syntax': 'off' },
   },
   { files: ['src/prefs/**'], rules: { 'no-restricted-imports': 'off' } },
+  { files: ['src/auth/credentialVault.ts'], rules: { 'no-restricted-imports': 'off' } }, // the one place expo-secure-store may be imported
   { files: ['src/api/**'], rules: { 'no-restricted-globals': 'off', 'no-restricted-properties': 'off' } },
   {
     files: ['tests/**', 'jest.setup.ts'],
