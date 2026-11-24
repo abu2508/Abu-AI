@@ -24,12 +24,12 @@ export const TAB_BAR_HEIGHT = 64;
 
 /** The minimal slice of the router's tab-bar props we use (keeps us off the router's internal type paths). */
 export type AbuTabBarProps = {
-  state: { index: number; routes: { name: string }[] };
-  navigation: { navigate: (route: string) => void };
+  state: { index: number; routes: { name: string; key: string }[] };
+  navigateToTab: (routeKey: string) => void;
 };
 
 /** Four domain tabs with the persistent Abu orb in the centre (opens the Ask Abu command surface). */
-export function AbuTabBar({ state, navigation }: AbuTabBarProps) {
+export function AbuTabBar({ state, navigateToTab }: AbuTabBarProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -52,7 +52,10 @@ export function AbuTabBar({ state, navigation }: AbuTabBarProps) {
         accessibilityRole="tab"
         accessibilityLabel={t.label}
         accessibilityState={{ selected: active }}
-        onPress={() => navigation.navigate(t.route)}
+        onPress={() => {
+          const route = state.routes.find((r) => r.name === t.route);
+          if (route) navigateToTab(route.key);
+        }}
         style={{ flex: 1, minHeight: minTarget, alignItems: 'center', justifyContent: 'center', gap: 2 }}
       >
         {t.domain ? (
