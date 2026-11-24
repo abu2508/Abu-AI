@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+coverage/
+web-build/
+*.log
+.DS_Store
+screenshots/tmp/

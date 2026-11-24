@@ -1,0 +1,4 @@
+{
+  "note": "Moderate advisories in Node-side dev/build tooling accepted in docs/mobile/DEPENDENCY_AUDIT.md. The gate fails on ANY high/critical, and on a moderate count above this ratchet.",
+  "maxModerate": 20
+}

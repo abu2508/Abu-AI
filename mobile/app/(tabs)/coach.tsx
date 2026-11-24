@@ -1,0 +1,5 @@
+import { CoachScreen } from '@/features/coach/CoachScreen';
+
+export default function Route() {
+  return <CoachScreen />;
+}

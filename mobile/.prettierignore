@@ -1,0 +1,7 @@
+node_modules
+dist
+.expo
+src/api/generated
+openapi
+package-lock.json
+coverage

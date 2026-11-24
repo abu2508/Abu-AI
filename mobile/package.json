@@ -1,0 +1,67 @@
+{
+  "name": "abu-ai-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "jest",
+    "api:types": "openapi-typescript openapi/openapi.json -o src/api/generated/schema.d.ts",
+    "api:types:check": "node scripts/check-generated-types.mjs",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:install-scripts": "node scripts/check-install-scripts.mjs",
+    "check:audit": "node scripts/audit-gate.mjs",
+    "check:secrets": "node scripts/scan-secrets.mjs",
+    "check:all": "npm run check:sdk && npm run typecheck && npm run lint && npm run format:check && npm test && npm run api:types:check && npm run check:licenses && npm run check:install-scripts && npm run check:audit && npm run check:secrets",
+    "export:web": "expo export --platform web",
+    "assets": "node scripts/generate-assets.mjs",
+    "screenshots": "node scripts/screenshots.mjs",
+    "check:sdk": "node scripts/check-sdk-alignment.mjs"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "57.0.19",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "57.0.34",
+    "expo-constants": "57.0.25",
+    "expo-font": "57.0.4",
+    "expo-linking": "57.0.14",
+    "expo-router": "57.0.32",
+    "expo-splash-screen": "57.0.12",
+    "expo-status-bar": "57.0.1",
+    "expo-symbols": "57.0.3",
+    "expo-system-ui": "57.0.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "0.21.4",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "14.1.0",
+    "@types/react": "19.2.18",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jest": "30.5.2",
+    "jest-expo": "57.0.6",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0"
+  },
+  "overrides": {
+    "decode-uri-component": "0.5.1",
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  }
+}

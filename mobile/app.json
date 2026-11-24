@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Abu AI",
+    "slug": "abu-ai",
+    "version": "0.1.0",
+    "scheme": "abuai",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.abu.mobile.dev",
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-bloom.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F7F9",
+          "dark": {
+            "image": "./assets/splash-bloom.png",
+            "backgroundColor": "#0B0D12"
+          }
+        }
+      ],
+      "expo-system-ui"
+    ],
+    "extra": {
+      "mode": "demo"
+    }
+  }
+}

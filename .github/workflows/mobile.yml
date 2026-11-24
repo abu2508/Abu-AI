@@ -1,0 +1,49 @@
+name: mobile
+
+on:
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_OFFLINE: '1'
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      # Scripts are disabled by .npmrc (ignore-scripts=true); the allowlist gate below verifies which packages have any.
+      - run: npm ci
+      - name: SDK alignment, types, lint, format, tests
+        run: |
+          npm run check:sdk
+          npm run typecheck
+          npm run lint
+          npm run format:check
+          npm test
+      - name: Generated API types match the committed OpenAPI snapshot
+        run: npm run api:types:check
+      - name: Supply-chain gates (licences, install scripts, vulnerabilities)
+        run: |
+          npm run check:licenses
+          npm run check:install-scripts
+          npm run check:audit
+      - name: Web export and secret scan (source + bundle)
+        run: |
+          npm run export:web
+          npm run check:secrets
