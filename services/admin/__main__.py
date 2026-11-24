@@ -20,6 +20,7 @@ the server and database credentials, which no enrolled device ever holds.
   python -m services.admin executions list [--limit 20]
   python -m services.admin orchestrator bootstrap-mock [--user-memory finance_agent,...]   (grant mock alias + own memory, activate, enable)
   python -m services.admin orchestrator purge                (scrub expired idempotent replies; delete old run history)
+  python -m services.admin openapi export|check [--out FILE]   (offline OpenAPI snapshot; never starts a server)
   python -m services.admin domain purge|stats                (delete expired imported messages; row counts only)
   python -m services.admin memory stats
   python -m services.admin memory purge-expired            (retention: proposals, third-party summaries, threads...)
@@ -359,6 +360,9 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     mem.add_argument("--confirm")
     mem.add_argument("--file")
     mem.add_argument("--id")
+    oa = sub.add_parser("openapi", help="offline OpenAPI schema snapshot (no server involved)")
+    oa.add_argument("action", choices=["export", "check"])
+    oa.add_argument("--out", default="mobile/openapi/openapi.json")
     dom = add("domain", domain_cmd)
     dom.add_argument("action", choices=["purge", "stats"])
     orc = add("orchestrator", orchestrator_cmd)
@@ -372,11 +376,32 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     return p, h
 
 
+def openapi_cmd(a: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from services.api import openapi_export
+
+    out = Path(a.out)
+    if a.action == "export":
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(openapi_export.render(), encoding="utf-8")
+        print(f"wrote {out}")
+    elif not out.exists() or out.read_text(encoding="utf-8") != openapi_export.render():
+        raise SystemExit(f"{out} is missing or stale: run 'openapi export'")
+    else:
+        print("snapshot is current")
+
+
 async def run(argv: list[str] | None = None) -> None:
     parser, handlers = build_parser()
     args = parser.parse_args(argv)
     if args.cmd in ("version",) and args.action != "create" and args.number is None:
         parser.error("version number required")
+    if (
+        args.cmd == "openapi"
+    ):  # host-side: builds the app object offline; needs no database or secrets
+        openapi_cmd(args)
+        return
     if args.cmd == "memory" and args.action == "add-key":
         if not (args.file and args.id):
             parser.error("--file and --id are required")

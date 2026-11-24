@@ -469,6 +469,16 @@ alerts auto-confirmed by an opted-in account are only as accurate as the parser;
 disk encryption; reply drafts are templates until a real model is approved; planning ignores travel time and recurring
 calendar events (skipped, counted); the four deployment gates below are still open.
 
+## OpenAPI (controlled)
+
+The API schema is **never public**. Swagger UI and ReDoc do not exist in any environment, and `/openapi.json` is gone. Two controlled ways to get the schema:
+
+- **Offline snapshot (primary):** `python -m services.admin openapi export` builds the application object in-process (no server, database, network or credentials) and writes
+  `mobile/openapi/openapi.json` deterministically; `openapi check` fails if the committed snapshot is stale (a test enforces this). The mobile app generates types from this file.
+- **Authenticated dev route (optional):** set `ABU_OPENAPI_MODE=authenticated` (default `off`) to serve the schema at `GET /v1/dev/openapi.json` behind the normal bearer
+  authentication. The application **refuses to start** with `ABU_ENV=production` and any mode other than `off`. Do not forward a port to a development instance with this enabled
+  unless you accept that any enrolled device can read the schema.
+
 ## Prerequisites
 
 Python ≥ 3.12 (tested on 3.13), [uv](https://docs.astral.sh/uv/), Docker with Compose v2.

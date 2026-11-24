@@ -11,7 +11,17 @@ from core.governance.service import Governance
 from core.memory.runtime import build_keyring, open_runtime, verify_embedding_dimension
 from core.orchestrator.orchestrator import Orchestrator
 from domain.common.crypto import FieldCipher
-from services.api import agents, coach, finance, governance, health, memory, messaging, orchestrator
+from services.api import (
+    agents,
+    coach,
+    finance,
+    governance,
+    health,
+    memory,
+    messaging,
+    openapi_dev,
+    orchestrator,
+)
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.db import create_engine, create_sessionmaker
@@ -63,10 +73,11 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
         title="Abu AI",
         version="0.6.0",
         lifespan=lifespan,
-        # Interactive docs are development-only.
-        docs_url="/docs" if settings.docs_enabled else None,
+        # No interactive docs and no unauthenticated schema, in any environment (Swagger UI/ReDoc load CDN scripts).
+        # The schema is available only through the authenticated dev route below (off by default) or the offline export.
+        docs_url=None,
         redoc_url=None,
-        openapi_url="/openapi.json" if settings.docs_enabled else None,
+        openapi_url=None,
     )
     app.state.settings = settings
     app.state.limiter = limiter
@@ -75,6 +86,8 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.state.memory = None
     app.state.orchestrator = None
     app.include_router(health.router)
+    if settings.openapi_mode == "authenticated":
+        app.include_router(openapi_dev.router)
     app.include_router(auth_routes.router)
     app.include_router(agents.router)
     app.include_router(governance.router)

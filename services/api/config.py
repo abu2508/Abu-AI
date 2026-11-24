@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_CHARS = 32
@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ABU_", env_file=None, extra="ignore")
 
     env: Literal["development", "test", "production"] = "development"
+    # OpenAPI is OFF everywhere by default. "authenticated" serves the schema at /v1/dev/openapi.json behind the
+    # normal bearer authentication (development/test only). Swagger UI and ReDoc do not exist in any mode.
+    openapi_mode: Literal["off", "authenticated"] = "off"
     # SQLAlchemy async URL, e.g. postgresql+psycopg://user:pw@db:5432/abu_ai
     database_url: SecretStr | None = None
     litellm_master_key: SecretStr | None = None
@@ -75,9 +78,12 @@ class Settings(BaseSettings):
             raise ValueError(f"secret must be at least {MIN_SECRET_CHARS} characters")
         return v
 
-    @property
-    def docs_enabled(self) -> bool:
-        return self.env != "production"
+    @model_validator(mode="after")
+    def _openapi_never_in_production(self) -> "Settings":
+        """Fail closed: the schema may be served (authenticated) only in development/test, never in production."""
+        if self.env == "production" and self.openapi_mode != "off":
+            raise ValueError("ABU_OPENAPI_MODE must be 'off' when ABU_ENV=production")
+        return self
 
     def require_auth_secrets(self) -> tuple[SecretStr, SecretStr]:
         """Fail fast at startup instead of running with unauthenticated or weak auth."""
