@@ -48,3 +48,30 @@ There is **no `B  RECEIVED` line**: the second origin (`<PC-LAN-IP>:8802`) recei
 
 ## 6. Recommendation (not a change)
 See the hand-off message of the commit that added this file. In short: the evidence supports a **separate, scoped** reviewed commit, after your explicit approval, that allows native authenticated requests **on iOS only**, ties the verification to the tested SDK so that an SDK upgrade re-blocks it automatically, and keeps Android blocked until it has its own evidence.
+
+## 7. Rerun with runtime facts (2026-11-24, after commit `e4f6331`)
+Requested by the owner so the registry design has the exact runtime values. Recorded by Claude from three phone screenshots only. Claude did not run the canary. **`NATIVE_AUTH_TRANSPORT_VERIFIED` is still `false`; nothing was changed because of this result.**
+
+### 7.1 What the phone reported (`generatedAt` 2026-11-24T18:20:25.723Z)
+| Field | Value |
+|---|---|
+| `platform` / `osVersion` | `ios` / `27.2` (iPhone 17) |
+| `expoSdk` | `58.0.0` |
+| `reactNativeRuntime` | `0.88.0` |
+| `executionEnvironment` | `storeClient` (Expo Go) |
+| `appOwnership` | `expo` |
+| `expoGoVersion` | `1017894` (looks like a build identifier, not the marketing version; see 7.3) |
+| `transport` | `expoFetch: true`, `rnFetchForced: false` |
+| `overall` | **PASS** |
+For each of 301, 302, 307 and 308: `appSaw.httpStatus` equals the status, `appSaw.type: "default"`, `appSaw.error: null`, `secondOriginReceived: false`, `reachedFirstOrigin: true`, `verdict: PASS`. The canary address entered was the correct first-origin port (8801 on the PC's private LAN address, shown elsewhere as `<PC-LAN-IP>`), unlike the earlier INCONCLUSIVE attempt that used the Metro port.
+
+### 7.2 Not supplied for this rerun (so not recorded as fact)
+- The Windows console output (the four `A  POST /redir/...` lines, `=== RESULT: PASS ===`, no `B  RECEIVED`). Without it the second origin's side is **not independently confirmed** for this run; the phone's `secondOriginReceived: false` is the app's own view.
+- Repository commit tested and Node version for this run.
+- Expo Go version from its Settings tab for this run (earlier reported as 58.0.5).
+- Confirmation that the firewall rule was removed.
+
+### 7.3 Notes
+- The new fields are confirmed readable in Expo Go SDK 58: SDK 58.0.0, React Native runtime 0.88.0, `storeClient`, iOS 27.2.
+- Proposal, not yet changed: rename `expoGoVersion` to `expoGoBuild`, so it is not mistaken for 58.0.5. Awaiting owner agreement.
+- Scope is unchanged from sections 5 and 6: redirect behaviour only, one device, Expo Go only. It does not authorise authenticated requests and does not clear any production security gate (G1-G4).
