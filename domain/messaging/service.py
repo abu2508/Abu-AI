@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.memory.privacy import injection_flags
@@ -245,6 +245,7 @@ class MessagingService:
             shared_with_assistant=share_with_assistant,
             tone_pref=tone_pref,
             retention_days=retention_days,
+            timestamps_reliable=fmt != "labelled",  # a labelled paste has no real timestamps
         )
         self._s.add(conv)
         await self._s.flush()
@@ -267,6 +268,10 @@ class MessagingService:
             raise MessagingError(
                 "import_failed", f"could not read the conversation ({exc})"
             ) from None
+        if fmt == "labelled":
+            conv.timestamps_reliable = (
+                False  # synthetic timestamps now present: stop reporting times
+            )
         added, dup = await self._insert(conv, msgs)
         return {"imported": added, "duplicates": dup, "message_count": conv.message_count}
 
@@ -356,15 +361,7 @@ class MessagingService:
                 "not_shared", "this conversation is not shared with the assistant", 403
             )
         msgs = await self._msgs(user_id, conv)
-        # labelled-paste imports have synthetic one-minute spacing: do not report response times from them
-        real = (
-            len({m.sent_at for m in msgs}) == len(msgs)
-            and not all(
-                (b.sent_at - a.sent_at) == timedelta(minutes=1)
-                for a, b in zip(msgs, msgs[1:], strict=False)
-            )
-            or len(msgs) < 3
-        )
+        real = conv.timestamps_reliable  # single source of truth (set at import)
         result = an.analyse(msgs, self.now(), has_real_timestamps=real)
         flagged = (
             await self._s.execute(
@@ -397,6 +394,118 @@ class MessagingService:
         out = an.suggest_replies(a, tone or conv.tone_pref, rel)
         out["conversation_id"] = conv.id
         return out
+
+    async def inbox(
+        self, user_id: uuid.UUID, *, limit: int = 50, offset: int = 0, shared_only: bool = False
+    ) -> tuple[list[dict[str, Any]], int]:
+        """One page of the owner's inbox with reply status, in a CONSTANT number of queries (page, total, latest
+        message metadata, bodies for shared conversations only, flag counts): no per-row analysis.
+
+        Privacy rule enforced HERE (server-side, read fresh from the database on every request): everything derived
+        from message CONTENT - `last_message_intent` and `flagged_messages` - is returned only for conversations the
+        user explicitly shared with Abu. For an unshared conversation those are null and its message bodies are
+        never loaded or decrypted. `needs_reply`/`last_sender`/`waiting_hours` come from sender and timestamp
+        metadata only. No message text is ever returned."""
+        base = select(MsgConversation).where(MsgConversation.user_id == user_id)
+        if shared_only:
+            base = base.where(MsgConversation.shared_with_assistant.is_(True))
+        total = (
+            await self._s.execute(select(func.count()).select_from(base.subquery()))
+        ).scalar_one()
+        convs = list(
+            (
+                await self._s.execute(
+                    base.order_by(
+                        MsgConversation.last_message_at.desc().nulls_last(), MsgConversation.id
+                    )
+                    .limit(limit)
+                    .offset(offset)
+                )
+            ).scalars()
+        )
+        if not convs:
+            return [], total
+        ids = [c.id for c in convs]
+        now = self.now()
+        # Latest unexpired message per conversation: METADATA ONLY (no body column is selected here).
+        latest = {
+            row.conversation_id: row
+            for row in (
+                await self._s.execute(
+                    select(
+                        MsgMessage.id,
+                        MsgMessage.conversation_id,
+                        MsgMessage.sender,
+                        MsgMessage.sent_at,
+                    )
+                    .where(
+                        MsgMessage.conversation_id.in_(ids),
+                        MsgMessage.user_id == user_id,
+                        MsgMessage.expires_at > now,
+                    )
+                    .ext(distinct_on(MsgMessage.conversation_id))
+                    .order_by(MsgMessage.conversation_id, MsgMessage.sent_at.desc(), MsgMessage.id)
+                )
+            ).all()
+        }
+        shared_ids = {c.id for c in convs if c.shared_with_assistant}
+        need_intent = {
+            cid: row.id for cid, row in latest.items() if cid in shared_ids and row.sender == "them"
+        }
+        intents: dict[uuid.UUID, str] = {}
+        if need_intent:  # bodies are loaded ONLY for shared conversations whose last message is from the other party
+            for mid, cid, blob in (
+                await self._s.execute(
+                    select(MsgMessage.id, MsgMessage.conversation_id, MsgMessage.body_enc).where(
+                        MsgMessage.id.in_(list(need_intent.values())), MsgMessage.user_id == user_id
+                    )
+                )
+            ).all():
+                intents[cid] = an.classify_intent(self._c.open(user_id, mid, "msg.body", blob))
+        flagged: dict[uuid.UUID, int] = {}
+        if shared_ids:
+            flagged = {
+                cid: n
+                for cid, n in (
+                    await self._s.execute(
+                        select(MsgMessage.conversation_id, func.count())
+                        .where(
+                            MsgMessage.conversation_id.in_(list(shared_ids)),
+                            MsgMessage.user_id == user_id,
+                            MsgMessage.flagged.is_(True),
+                        )
+                        .group_by(MsgMessage.conversation_id)
+                    )
+                ).all()
+            }
+        out: list[dict[str, Any]] = []
+        for c in convs:
+            last = latest.get(c.id)
+            needs_reply = last is not None and last.sender == "them"
+            shared = c.shared_with_assistant
+            out.append(
+                {
+                    "id": c.id,
+                    "slug": c.slug,
+                    "platform": c.platform,
+                    "title": self._c.open(c.user_id, c.id, "msg.conv.title", c.title_enc)
+                    if c.title_enc
+                    else None,
+                    "contact_id": c.contact_id,
+                    "shared_with_assistant": shared,
+                    "message_count": c.message_count,
+                    "last_message_at": c.last_message_at,
+                    "last_sender": last.sender if last else None,
+                    "needs_reply": needs_reply,
+                    "waiting_hours": round((now - last.sent_at).total_seconds() / 3600, 1)
+                    if needs_reply and last is not None and c.timestamps_reliable
+                    else None,
+                    "timestamps_reliable": c.timestamps_reliable,
+                    "last_message_intent": intents.get(c.id) if shared else None,
+                    "flagged_messages": flagged.get(c.id, 0) if shared else None,
+                }
+            )
+        return out, total
 
     async def purge_expired(self) -> int:
         res = await self._s.execute(delete(MsgMessage).where(MsgMessage.expires_at <= self.now()))

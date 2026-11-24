@@ -469,6 +469,16 @@ alerts auto-confirmed by an opted-in account are only as accurate as the parser;
 disk encryption; reply drafts are templates until a real model is approved; planning ignores travel time and recurring
 calendar events (skipped, counted); the four deployment gates below are still open.
 
+## Messaging inbox (B1)
+
+`GET /v1/messaging/inbox?limit=50&offset=0&shared_only=false` returns the owner's conversations with reply status in **one paged request** (constant number of SQL statements; `X-Total-Count` header; limit 1-100).
+Fields: `id, slug, platform, title, contact_id, shared_with_assistant, message_count, last_message_at, last_sender, needs_reply, waiting_hours, timestamps_reliable, last_message_intent, flagged_messages`.
+
+**Privacy rule, enforced on the server on every request:** `last_message_intent` and `flagged_messages` are derived from message *content* and are returned **only for conversations explicitly shared with Abu AI**.
+For an unshared conversation they are `null` and its message bodies are never loaded or decrypted (ownership alone is not permission for AI processing). Changing the sharing flag takes effect on the very next request
+(tested, including the agent paths). `needs_reply`, `last_sender` and `waiting_hours` use sender/timestamp metadata only. No message text is ever returned. `waiting_hours` is null when timestamps are synthetic
+(`timestamps_reliable=false`, set for "labelled" pastes; migration 0011).
+
 ## OpenAPI (controlled)
 
 The API schema is **never public**. Swagger UI and ReDoc do not exist in any environment, and `/openapi.json` is gone. Two controlled ways to get the schema:

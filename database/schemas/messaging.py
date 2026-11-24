@@ -61,6 +61,9 @@ class MsgConversation(Base):
         ForeignKey("msg_contacts.id", ondelete="SET NULL")
     )
     title_enc: Mapped[bytes | None] = mapped_column(LargeBinary)
+    # False when message timestamps are synthetic (a 'labelled' paste has none): response times and waiting
+    # hours are then never reported.
+    timestamps_reliable: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     shared_with_assistant: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
     )

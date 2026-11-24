@@ -310,3 +310,59 @@ def test_memory_migration_sets_up_pgvector_checkpoint_schema_and_guards(
             == 0
         )
     eng.dispose()
+
+
+def test_0011_timestamps_reliable_backfill_and_downgrade(scratch_db: Callable[[], URL]) -> None:
+    """Existing conversations whose messages are exactly one minute apart (labelled pastes) are backfilled as unreliable."""
+    url = scratch_db()
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "0010")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        uid = c.execute(
+            text("INSERT INTO users (display_name) VALUES ('t') RETURNING id")
+        ).scalar_one()
+
+        def conv(slug: str, gaps_minutes: list[int]) -> None:
+            cid = c.execute(
+                text(
+                    "INSERT INTO msg_conversations (user_id, slug, platform, message_count) "
+                    "VALUES (:u, :s, 'sms', :n) RETURNING id"
+                ),
+                {"u": uid, "s": slug, "n": len(gaps_minutes) + 1},
+            ).scalar_one()
+            t = "2024-01-01T10:00:00+00"
+            offsets = [0]
+            for g in gaps_minutes:
+                offsets.append(offsets[-1] + g)
+            for i, off in enumerate(offsets):
+                c.execute(
+                    text(
+                        "INSERT INTO msg_messages (user_id, conversation_id, sender, sent_at, body_enc, content_hash, expires_at) "
+                        "VALUES (:u, :c, 'them', CAST(:t AS timestamptz) + make_interval(mins => :o), '\\x00', :h, now() + interval '1 day')"
+                    ),
+                    {"u": uid, "c": cid, "t": t, "o": off, "h": f"{slug}{i}"},
+                )
+
+        conv("c-synth", [1, 1, 1])  # exactly one minute apart: synthetic
+        conv("c-real", [1, 5, 1])  # a gap that is not one minute: real
+        conv("c-short", [1])  # fewer than 3 messages: left reliable
+    command.upgrade(cfg, "0011")
+    with eng.connect() as c:
+        flags: dict[str, bool] = dict(
+            c.execute(text("SELECT slug, timestamps_reliable FROM msg_conversations")).all()
+        )
+    assert flags == {"c-synth": False, "c-real": True, "c-short": True}
+    command.downgrade(cfg, "0010")
+    with eng.connect() as c:
+        cols = {
+            r[0]
+            for r in c.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name='msg_conversations'"
+                )
+            )
+        }
+    assert "timestamps_reliable" not in cols
+    command.upgrade(cfg, "head")
+    eng.dispose()

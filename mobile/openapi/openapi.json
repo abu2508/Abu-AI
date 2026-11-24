@@ -1425,6 +1425,140 @@
         "title": "IcsIn",
         "type": "object"
       },
+      "InboxItem": {
+        "properties": {
+          "contact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
+          "flagged_messages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flagged Messages"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "last_message_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message Intent"
+          },
+          "last_sender": {
+            "anyOf": [
+              {
+                "enum": [
+                  "me",
+                  "them"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sender"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "needs_reply": {
+            "title": "Needs Reply",
+            "type": "boolean"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "shared_with_assistant": {
+            "title": "Shared With Assistant",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "timestamps_reliable": {
+            "title": "Timestamps Reliable",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "waiting_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Hours"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "platform",
+          "title",
+          "contact_id",
+          "shared_with_assistant",
+          "message_count",
+          "last_message_at",
+          "last_sender",
+          "needs_reply",
+          "waiting_hours",
+          "timestamps_reliable",
+          "last_message_intent",
+          "flagged_messages"
+        ],
+        "title": "InboxItem",
+        "type": "object"
+      },
       "IngestIn": {
         "additionalProperties": false,
         "properties": {
@@ -8138,6 +8272,83 @@
           }
         ],
         "summary": "Suggestions",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/v1/messaging/inbox": {
+      "get": {
+        "description": "The owner's inbox in one paged request (constant query count). Content-derived fields are null for\nconversations not shared with Abu AI; no message text is ever returned.",
+        "operationId": "inbox_v1_messaging_inbox_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shared_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Shared Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InboxItem"
+                  },
+                  "title": "Response Inbox V1 Messaging Inbox Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Inbox",
         "tags": [
           "messaging"
         ]

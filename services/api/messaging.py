@@ -2,6 +2,7 @@
 There is NO route that sends, forwards or posts a message, and none can be added without a new milestone."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
@@ -50,6 +51,24 @@ class AppendIn(Body):
     format: Literal["whatsapp_export", "labelled", "json"]
     text: str = Field(min_length=1, max_length=900_000)
     my_name: str | None = Field(default=None, max_length=60)
+
+
+class InboxItem(BaseModel):
+    id: uuid.UUID
+    slug: str
+    platform: str
+    title: str | None
+    contact_id: uuid.UUID | None
+    shared_with_assistant: bool
+    message_count: int
+    last_message_at: datetime | None
+    last_sender: Literal["me", "them"] | None
+    needs_reply: bool
+    waiting_hours: float | None
+    timestamps_reliable: bool
+    # Derived from message CONTENT: null unless the conversation is explicitly shared with Abu AI.
+    last_message_intent: str | None
+    flagged_messages: int | None
 
 
 class ConversationPatch(Body):
@@ -154,6 +173,26 @@ async def list_conversations(
 ) -> Any:
     s = MessagingService(session, cipher)
     return jsonable([s.conversation_view(c) for c in await s.conversations(principal.user_id)])
+
+
+@router.get("/inbox", response_model=list[InboxItem])
+async def inbox(
+    principal: PrincipalDep,
+    session: SessionDep,
+    cipher: CipherDep,
+    response: Response,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+    shared_only: bool = False,
+) -> Any:
+    """The owner's inbox in one paged request (constant query count). Content-derived fields are null for
+    conversations not shared with Abu AI; no message text is ever returned."""
+    s = MessagingService(session, cipher)
+    items, total = await s.inbox(
+        principal.user_id, limit=limit, offset=offset, shared_only=shared_only
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return jsonable(items)
 
 
 @router.get("/conversations/{conv_id}")
