@@ -121,8 +121,8 @@ describe('native credential gate', () => {
     expect(makeWorld({ platform: 'web' }).rt.nativeBlockReason).toBeNull();
   });
 
-  it('the committed (empty) registry blocks even with the boolean true and facts that would match', async () => {
-    const w = makeWorld({ platform: 'ios', nativeVerified: true, facts: MATCHING_FACTS });
+  it('an empty registry blocks even with the boolean true and facts that would match', async () => {
+    const w = makeWorld({ platform: 'ios', nativeVerified: true, facts: MATCHING_FACTS, registry: [] });
     expect(w.rt.nativeBlockReason).toBe('no_verification');
     w.server.addCode('CODE-AAAA-1111', 'user-a');
     await expect(w.rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({

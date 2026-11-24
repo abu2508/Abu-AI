@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "id": "ios-expo-go-sdk58-2026-11-24",
+    "scope": "redirect-behaviour-only",
+    "platform": "ios",
+    "environment": "expo-go",
+    "expoSdk": "58.0.0",
+    "reactNativeRuntime": "0.88.0",
+    "iosMajor": 27,
+    "buildPins": { "expo": "58.0.26", "react-native": "0.88.1" },
+    "canary": "301, 302, 307, 308: PASS, second origin received nothing",
+    "evidence": "docs/mobile/reports/REDIRECT_CANARY_EVIDENCE.md",
+    "verifiedOn": "2026-11-24"
+  }
+]

@@ -172,15 +172,48 @@ describe('getRuntimeFacts / describeRuntime across environments', () => {
 });
 
 describe('the committed registry and the two-key gate', () => {
-  it('the production boolean is false and the committed registry is empty (phase invariant until commit 4)', () => {
+  it('phase invariant (commit 4): the committed registry holds exactly the one approved iOS / Expo Go entry, and the boolean is still false', () => {
     expect(NATIVE_AUTH_TRANSPORT_VERIFIED).toBe(false);
-    expect(registryJson).toEqual([]);
-    expect(REDIRECT_REGISTRY).toEqual([]);
+    expect(registryJson).toHaveLength(1);
+    expect(REDIRECT_REGISTRY).toHaveLength(1); // nothing was dropped as malformed
+    expect(REDIRECT_REGISTRY[0]).toEqual({
+      id: 'ios-expo-go-sdk58-2026-11-24',
+      scope: 'redirect-behaviour-only',
+      platform: 'ios',
+      environment: 'expo-go',
+      expoSdk: '58.0.0',
+      reactNativeRuntime: '0.88.0',
+      iosMajor: 27,
+      buildPins: { expo: '58.0.26', 'react-native': '0.88.1' },
+      canary: '301, 302, 307, 308: PASS, second origin received nothing',
+      evidence: 'docs/mobile/reports/REDIRECT_CANARY_EVIDENCE.md',
+      verifiedOn: '2026-11-24',
+    });
   });
-  it('while the registry is empty EVERY native fact set is blocked, even with the boolean true', () => {
-    for (const p of ['ios', 'android'])
-      for (const f of [MATCHING_FACTS, facts({ platform: p }), null, undefined])
-        expect(credentialsAllowed(p, true, f, REDIRECT_REGISTRY)).toBe(false);
+  it('the exact iOS / Expo Go configuration is redirect-verified, yet native authenticated requests stay BLOCKED by the boolean', () => {
+    const r = redirectVerificationState(MATCHING_FACTS, REDIRECT_REGISTRY);
+    expect(r).toMatchObject({ redirectVerified: true, reason: 'verified' });
+    expect(r.entry?.id).toBe('ios-expo-go-sdk58-2026-11-24');
+    expect(redirectRowText(r)).toMatch(/does not authorise authenticated requests\.$/);
+    // the committed boolean is the default: redirect verification alone opens nothing
+    expect(credentialsAllowed('ios', undefined, MATCHING_FACTS, REDIRECT_REGISTRY)).toBe(false);
+    expect(nativeAuthDecision(undefined, MATCHING_FACTS, REDIRECT_REGISTRY)).toEqual({
+      allowed: false,
+      reason: 'authorisation_not_granted',
+    });
+    expect(nativeGateFor('ios', false, MATCHING_FACTS, REDIRECT_REGISTRY).allowed).toBe(false);
+    expect(NATIVE_GATE_STATUS(nativeAuthDecision(undefined, MATCHING_FACTS, REDIRECT_REGISTRY))).toBe('BLOCKED');
+  });
+  it('no other configuration is verified: Android, other builds, other SDK, runtime or iOS major', () => {
+    for (const [over, reason] of [
+      [{ platform: 'android' }, 'platform_not_verified'],
+      [{ executionEnvironment: 'standalone' }, 'environment_not_verified'],
+      [{ executionEnvironment: 'bare' }, 'environment_not_verified'],
+      [{ expoSdk: '59.0.0' }, 'sdk_mismatch'],
+      [{ reactNativeRuntime: '0.88.1' }, 'react_native_mismatch'],
+      [{ osVersion: '26.5' }, 'os_major_mismatch'],
+    ] as const)
+      expect(redirectVerificationState(facts(over), REDIRECT_REGISTRY)).toEqual({ redirectVerified: false, reason });
   });
   it('with the boolean false an exact-match entry changes NOTHING (the registry never authorises)', () => {
     for (const f of [MATCHING_FACTS, facts({ platform: 'android' })]) {

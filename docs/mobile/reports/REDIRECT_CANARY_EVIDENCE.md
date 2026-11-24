@@ -88,7 +88,7 @@ The repository commit, Node version, Expo Go marketing version and the firewall 
 - Owner approved renaming `expoGoVersion` to `expoGoBuild` (the value above is a build identifier, not 58.0.5) and keeping a separate `expoGoMarketingVersion`, recorded by hand from Expo Go's Settings screen and never derived from the build value. The app now reports `expoGoMarketingVersion: null`. The run above used the old field name, `expoGoVersion`.
 - Scope is unchanged from sections 5 and 6: redirect behaviour only, one device, Expo Go only. It does not authorise authenticated requests and does not clear any production security gate (G1-G4).
 
-## 8. Build provenance of the rerun in section 7 (R11) and the proposed registry entry (NOT applied)
+## 8. Build provenance of the rerun in section 7 (R11) and the registry entry (applied in commit 4)
 Recorded from output and text the owner supplied. Claude did not run any of it.
 
 ```
@@ -108,7 +108,7 @@ Provenance Expo Go build: 1017894
 | Firewall cleanup | The temporary rule "Abu AI redirect canary (temporary)" (inbound, Private profile) was still present when checked; the owner removed it, and `Get-NetFirewallRule -DisplayName "*canary*"` then printed nothing, as did `Get-NetTCPConnection -LocalPort 8801,8802,8081 -State Listen` | owner's PowerShell output |
 | Playwright E2E (separate, unrelated to the canary) | Reported by Claude after commits 2 and 3: only the last 30 lines of its output were retained, all PASS; the complete run is **not** independently confirmed | this evidence record |
 
-Proposed entry (**not applied**; `redirectVerifications.json` stays `[]` until the owner separately approves commit 4):
+Registry entry (the owner approved commit 4; it is applied unchanged in `mobile/src/config/redirectVerifications.json`, and `NATIVE_AUTH_TRANSPORT_VERIFIED` stays `false`, so it authorises nothing):
 ```json
 {
   "id": "ios-expo-go-sdk58-2026-11-24",

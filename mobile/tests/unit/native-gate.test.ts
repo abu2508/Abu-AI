@@ -69,9 +69,11 @@ function run(over: Tree = {}, entries: unknown[] = [ENTRY], extra: string[] = []
 const withEntry = (patch: Record<string, unknown>) => [{ ...ENTRY, ...patch }];
 
 describe('check:native-gate on the real tree', () => {
-  it('passes: no redirect entries, boolean false, all of R1-R11 listed', () => {
+  it('passes: exactly one redirect entry, boolean false, all of R1-R11 listed', () => {
     const out = execFileSync('node', ['scripts/check-native-gate.mjs'], { encoding: 'utf8' });
-    expect(out).toMatch(/Native gate OK: 0 redirect entries .* authorisation boolean false, 11 requirements/);
+    expect(out).toMatch(
+      /Native gate OK: 1 redirect entry \(redirect behaviour only\), authorisation boolean false, 11 requirements/,
+    );
   });
   it('the committed checklist has every requirement NOT MET (R7 BLOCKED) and no approval', () => {
     const rows = REAL_CHECKLIST.split('\n').filter((l) => /^\| R\d+ \|/.test(l));

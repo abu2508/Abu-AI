@@ -1,6 +1,6 @@
 # Plan (revision 3): record verified redirect behaviour per configuration, without authorising native authenticated requests
 
-Implementation status (2026-11-24, after review of the rerun evidence `998e29f`): **commits 2 and 3 are implemented** (registry empty, boolean `false`, guard `check:native-gate`, checklist `NATIVE_AUTH_AUTHORISATION.md`); `expoGoVersion` was renamed `expoGoBuild` and a `null` `expoGoMarketingVersion` was added, as approved. Commit 4 and any change of the boolean are NOT approved. Original status line follows.
+Implementation status (2026-11-24, after review of the rerun evidence `998e29f`): **commits 2 and 3 are implemented** (registry empty, boolean `false`, guard `check:native-gate`, checklist `NATIVE_AUTH_AUTHORISATION.md`); `expoGoVersion` was renamed `expoGoBuild` and a `null` `expoGoMarketingVersion` was added, as approved. **Commit 4 is implemented** (the single iOS / Expo Go entry `ios-expo-go-sdk58-2026-11-24`, redirect-only; the boolean is still `false`, so authenticated requests stay blocked). Any change of the boolean is NOT approved. Original status line follows.
 
 Status: **Revision 3 records your decisions E1-E4 and clarifications. Commit 1 is done and accepted. Commits 2 and 3 are approved but MUST NOT START until the iPhone canary re-run evidence has been reviewed. Commit 4 is conditionally approved (separate approval needed). Changing `NATIVE_AUTH_TRANSPORT_VERIFIED` is NOT approved.**
 Branch `claude/charming-davinci-vqv0du`. Revision 1 was commit `c3cbd2232797398a96aef87f31c4c6d995ae760d`, revision 2 `f6e4c66eaaa40229b2f85bf9e93d401e3487d8c0`.
@@ -51,7 +51,7 @@ Expo Go runs the **app JavaScript** from this repository and the **native runtim
 
 ## 5. Design
 ### 5.1 Redirect-verification registry (data only)
-`mobile/src/config/redirectVerifications.json` (a list, **empty until commit 4**):
+`mobile/src/config/redirectVerifications.json` (a list, **empty until commit 4; it now holds the one approved entry**):
 ```json
 {
   "id": "ios-expo-go-sdk58-2026-11-24",

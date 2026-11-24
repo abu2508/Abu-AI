@@ -82,11 +82,11 @@ describe('Settings navigation', () => {
     expect(
       screen.getByText('Authenticated requests are disabled. Redirect verification alone does not authorise access.'),
     ).toBeTruthy();
-    // the committed registry is empty, so nothing is verified and the reason is stated
+    // Jest reports its own execution environment (mock), not Expo Go, so nothing is verified and the reason is stated
     expect(screen.getByText('Not verified')).toBeTruthy();
     expect(
       screen.getByText(
-        'Redirect behaviour is not verified for this build: no verified configuration is recorded. Authenticated requests are disabled.',
+        'Redirect behaviour is not verified for this build: this is not Expo Go, the only environment tested. Authenticated requests are disabled.',
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Verified')).toBeNull();
