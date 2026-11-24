@@ -65,10 +65,24 @@ Requested by the owner so the registry design has the exact runtime values. Reco
 | `overall` | **PASS** |
 For each of 301, 302, 307 and 308: `appSaw.httpStatus` equals the status, `appSaw.type: "default"`, `appSaw.error: null`, `secondOriginReceived: false`, `reachedFirstOrigin: true`, `verdict: PASS`. The canary address entered was the correct first-origin port (8801 on the PC's private LAN address, shown elsewhere as `<PC-LAN-IP>`), unlike the earlier INCONCLUSIVE attempt that used the Metro port.
 
-### 7.2 Not supplied for this rerun (so not recorded as fact)
-- The Windows console output (the four `A  POST /redir/...` lines, `=== RESULT: PASS ===`, no `B  RECEIVED`). Without it the second origin's side is **not independently confirmed** for this run; the phone's `secondOriginReceived: false` is the app's own view.
-- Repository commit tested and Node version for this run.
-- Expo Go version from its Settings tab for this run (earlier reported as 58.0.5).
+### 7.2 What the canary server reported for this run (Windows console, owner-supplied text)
+```
+[2026-11-24T18:20:25.978Z] A  POST /redir/301 (authorization:true body:88b) -> redirect to B
+[2026-11-24T18:20:25.997Z] A  POST /redir/302 (authorization:true body:88b) -> redirect to B
+[2026-11-24T18:20:26.012Z] A  POST /redir/307 (authorization:true body:88b) -> redirect to B
+[2026-11-24T18:20:26.027Z] A  POST /redir/308 (authorization:true body:88b) -> redirect to B
+
+=== RESULT: PASS ===
+  301: PASS  (reachedA=true, bReceived=false)
+  302: PASS  (reachedA=true, bReceived=false)
+  307: PASS  (reachedA=true, bReceived=false)
+  308: PASS  (reachedA=true, bReceived=false)
+```
+There is **no `B  RECEIVED` line**: the second origin received nothing, and the first origin received the fake credentials (`authorization:true`, 88 bytes) for all four statuses. Phone and server agree. The phone's `generatedAt` (18:20:25.723Z) precedes the server's first line by about 255 ms, consistent with two devices whose clocks differ slightly. The console output was supplied as text from the start of the canary's output; the start-up banner is omitted above except that it showed the canary bound to the PC's private LAN address.
+
+### 7.2a Still not supplied for this rerun (not recorded as fact)
+- The repository commit tested and the Node version for this run.
+- The Expo Go version from its Settings tab for this run (earlier reported as 58.0.5).
 - Confirmation that the firewall rule was removed.
 
 ### 7.3 Notes
