@@ -76,6 +76,23 @@ describe('Settings navigation', () => {
     expect(screen.getByText('Native authenticated transport')).toBeTruthy();
   });
 
+  it('About shows TWO separate rows: authentication BLOCKED, and redirect verification (never merged, never BLOCKED)', async () => {
+    await go('/settings/about');
+    await screen.findByText('Redirect verification');
+    expect(
+      screen.getByText('Authenticated requests are disabled. Redirect verification alone does not authorise access.'),
+    ).toBeTruthy();
+    // the committed registry is empty, so nothing is verified and the reason is stated
+    expect(screen.getByText('Not verified')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Redirect behaviour is not verified for this build: no verified configuration is recorded. Authenticated requests are disabled.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Verified')).toBeNull();
+    expect(screen.getAllByText('BLOCKED')).toHaveLength(5); // row 2 never reads BLOCKED
+  });
+
   it('later-milestone sections are explicit placeholders, not fake features', async () => {
     await go('/settings/memory');
     await waitFor(() => expect(screen.getByText(/arrives in a later milestone/)).toBeTruthy());

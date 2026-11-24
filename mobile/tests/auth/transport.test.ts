@@ -20,6 +20,7 @@ import { createAuthRuntime } from '@/auth/runtime';
 import { NATIVE_AUTH_TRANSPORT_VERIFIED, NATIVE_GATE_STATUS, credentialsAllowed } from '@/config/transportGate';
 import { nodeFetch } from '../support/nodeFetch';
 import { ORIGIN } from '../support/fakeBackend';
+import { MATCHING_FACTS, TEST_ENTRY, facts } from '../support/redirectFixtures';
 import { authStatusStore } from '@/auth/statusStore';
 import { enrolled, makeWorld } from '../support/harness';
 
@@ -29,7 +30,9 @@ describe('native credential gate', () => {
     expect(credentialsAllowed('ios')).toBe(false);
     expect(credentialsAllowed('android')).toBe(false);
     expect(credentialsAllowed('web')).toBe(true);
-    expect(credentialsAllowed('ios', true)).toBe(true); // only an explicit, reviewed flip would do this
+    // two keys: even the boolean alone opens nothing while no redirect verification is recorded
+    expect(credentialsAllowed('ios', true)).toBe(false);
+    expect(credentialsAllowed('ios', true, MATCHING_FACTS, [TEST_ENTRY])).toBe(true); // both keys (test seams only)
   });
 
   it('defaults to the current platform (jest runs as iOS) and reports BLOCKED', () => {
@@ -70,8 +73,8 @@ describe('native credential gate', () => {
     expect(web.server.log).toHaveLength(hits); // zero requests of any kind
   });
 
-  it('a verified gate (only via a reviewed flip) or the web platform lets requests through', async () => {
-    const w = makeWorld({ platform: 'ios', nativeVerified: true });
+  it('both keys (boolean true AND a matching redirect entry, test seams only) or the web platform let requests through', async () => {
+    const w = makeWorld({ platform: 'ios', nativeVerified: true, facts: MATCHING_FACTS, registry: [TEST_ENTRY] });
     w.server.addCode('CODE-AAAA-1111', 'user-a');
     await w.rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' });
     expect(w.rt.status).toBe('authenticated');
@@ -79,6 +82,53 @@ describe('native credential gate', () => {
     const web = makeWorld({ platform: 'web' });
     await enrolled(web);
     expect(web.rt.nativeBlocked).toBe(false);
+  });
+
+  it('a matching redirect entry with the boolean FALSE still blocks enrollment, refresh and authenticated requests; nothing reaches the network', async () => {
+    for (const platform of ['ios', 'android']) {
+      const w = makeWorld({ platform, nativeVerified: false, facts: facts({ platform }), registry: [TEST_ENTRY] });
+      w.server.addCode('CODE-AAAA-1111', 'user-a');
+      expect(w.rt.nativeBlocked).toBe(true);
+      expect(w.rt.nativeBlockReason).toBe('authorisation_not_granted'); // reported ahead of any registry result
+      expect(w.rt.redirectState.redirectVerified).toBe(platform === 'ios');
+      await expect(w.rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
+        code: 'blocked_transport',
+      });
+      await expect(w.rt.listSessions()).rejects.toBeTruthy();
+      await expect(w.rt.coordinator.refresh()).rejects.toBeTruthy();
+      expect(w.server.log).toHaveLength(0);
+      expect(w.keychain.data.size).toBe(0);
+    }
+  });
+
+  it('with both keys but a mismatching build (SDK, runtime, iOS major, environment) requests are blocked with that reason', async () => {
+    for (const [over, reason] of [
+      [{ expoSdk: '59.0.0' }, 'sdk_mismatch'],
+      [{ reactNativeRuntime: '0.89.0' }, 'react_native_mismatch'],
+      [{ osVersion: '28.0' }, 'os_major_mismatch'],
+      [{ executionEnvironment: 'standalone' }, 'environment_not_verified'],
+    ] as const) {
+      const w = makeWorld({ platform: 'ios', nativeVerified: true, facts: facts(over), registry: [TEST_ENTRY] });
+      w.server.addCode('CODE-AAAA-1111', 'user-a');
+      expect(w.rt.nativeBlockReason).toBe(reason);
+      await expect(w.rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
+        code: 'blocked_transport',
+      });
+      expect(w.server.log).toHaveLength(0);
+    }
+    const ok = makeWorld({ platform: 'ios', nativeVerified: true, facts: MATCHING_FACTS, registry: [TEST_ENTRY] });
+    expect(ok.rt.nativeBlockReason).toBeNull();
+    expect(makeWorld({ platform: 'web' }).rt.nativeBlockReason).toBeNull();
+  });
+
+  it('the committed (empty) registry blocks even with the boolean true and facts that would match', async () => {
+    const w = makeWorld({ platform: 'ios', nativeVerified: true, facts: MATCHING_FACTS });
+    expect(w.rt.nativeBlockReason).toBe('no_verification');
+    w.server.addCode('CODE-AAAA-1111', 'user-a');
+    await expect(w.rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
+      code: 'blocked_transport',
+    });
+    expect(w.server.log).toHaveLength(0);
   });
 
   it('logout still wipes everything locally while blocked', async () => {

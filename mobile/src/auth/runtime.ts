@@ -16,7 +16,9 @@ import {
 } from '@/api/schemas';
 import { getApprovedBackends, IS_DEBUG_BUILD } from '@/config/approvedBackends';
 import type { ApprovedBackend } from '@/config/backendAllowlist';
-import { credentialsAllowed } from '@/config/transportGate';
+import type { RedirectVerificationEntry } from '@/config/redirectVerification';
+import type { RuntimeFacts } from '@/config/runtimeFacts';
+import { nativeGateFor, type NativeAuthReason, redirectVerificationState } from '@/config/transportGate';
 import { Platform } from 'react-native';
 import { createConnectivity, type Connectivity } from './connectivity';
 import { createCredentialVault, type CredentialVault } from './credentialVault';
@@ -45,6 +47,8 @@ export interface RuntimeDeps {
   /** Test seams for the native credential gate (production uses Platform.OS and the committed constant). */
   platform?: string;
   nativeVerified?: boolean;
+  facts?: RuntimeFacts;
+  registry?: readonly RedirectVerificationEntry[];
 }
 
 export type AuthedSpec<T> = Omit<RequestSpec<T>, 'bearer' | 'originOverride'> & { mutation?: boolean };
@@ -88,9 +92,9 @@ export function createAuthRuntime(deps: RuntimeDeps = {}) {
 
   const platform = deps.platform ?? Platform.OS;
   const nativeVerified = deps.nativeVerified;
+  const gate = () => nativeGateFor(platform, nativeVerified, deps.facts, deps.registry);
   const transportAllowed = () =>
-    credentialsAllowed(platform, nativeVerified) &&
-    (deps.transport !== undefined || platform === 'web' || isExpoFetchTransport());
+    gate().allowed && (deps.transport !== undefined || platform === 'web' || isExpoFetchTransport());
   const rawSend = createHttp({
     transport: deps.transport ?? defaultTransport,
     approved,
@@ -211,6 +215,15 @@ export function createAuthRuntime(deps: RuntimeDeps = {}) {
     /** True on native while the transport has not been verified on a device (credentialed requests are refused). */
     get nativeBlocked() {
       return !transportAllowed();
+    },
+    /** Why native credentialed requests are refused (the authorisation boolean is reported first), or null when allowed. */
+    get nativeBlockReason(): NativeAuthReason | null {
+      const g = gate();
+      return transportAllowed() ? null : g.allowed ? 'transport_not_expo_fetch' : g.reason;
+    },
+    /** Redirect verification on its own. It never authorises anything (see transportGate.ts). */
+    get redirectState() {
+      return redirectVerificationState(deps.facts, deps.registry);
     },
     get status(): AuthStatus {
       return store.getState().status;

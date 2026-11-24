@@ -168,7 +168,7 @@ describe('the canary reports PASS only when the second origin receives nothing',
 describe('runtime facts recorded with the evidence (describeRuntime)', () => {
   const expoGo = {
     executionEnvironment: 'storeClient',
-    expoVersion: '58.0.5',
+    expoVersion: '1017894',
     appOwnership: 'expo',
     expoConfig: { sdkVersion: '58.0.0' },
   };
@@ -188,7 +188,8 @@ describe('runtime facts recorded with the evidence (describeRuntime)', () => {
       expoSdk: '58.0.0',
       appOwnership: 'expo',
       executionEnvironment: 'storeClient',
-      expoGoVersion: '58.0.5',
+      expoGoBuild: '1017894',
+      expoGoMarketingVersion: null,
       reactNativeRuntime: '0.88.0',
     });
   });
@@ -209,7 +210,7 @@ describe('runtime facts recorded with the evidence (describeRuntime)', () => {
       expoSdk: null,
       appOwnership: null,
       executionEnvironment: null,
-      expoGoVersion: null,
+      expoGoBuild: null,
       reactNativeRuntime: null,
     });
     const garbage = { major: 'x' as unknown as number, minor: 1, patch: 2 };
@@ -223,6 +224,6 @@ describe('runtime facts recorded with the evidence (describeRuntime)', () => {
       { executionEnvironment: 'standalone', expoVersion: null },
     );
     expect(f.executionEnvironment).toBe('standalone');
-    expect(f.expoGoVersion).toBeNull();
+    expect(f.expoGoBuild).toBeNull();
   });
 });

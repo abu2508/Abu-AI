@@ -6,50 +6,8 @@
  */
 import type { Transport } from '@/api/http';
 
-/**
- * The runtime facts recorded with every canary report, so the evidence says exactly which native runtime it was taken on
- * (docs/mobile/NATIVE_GATE_PLAN.md). Pure: the platform and constants objects are passed in so tests need no device.
- * `reactNativeRuntime` is the NATIVE runtime's React Native version (in Expo Go it belongs to the Expo Go app, not to this
- * repository's `react-native` package); `expoGoVersion` is meaningful only when `executionEnvironment` is `storeClient`.
- */
-export interface RuntimePlatform {
-  OS: string;
-  Version: string | number;
-  constants?: {
-    reactNativeVersion?: { major: number; minor: number; patch: number; prerelease?: string | number | null };
-  };
-}
-export interface RuntimeConstants {
-  executionEnvironment?: string | null;
-  expoVersion?: string | null;
-  appOwnership?: string | null;
-  expoConfig?: { sdkVersion?: string } | null;
-}
-export interface RuntimeFacts {
-  platform: string;
-  osVersion: string;
-  expoSdk: string | null;
-  appOwnership: string | null;
-  executionEnvironment: string | null;
-  expoGoVersion: string | null;
-  reactNativeRuntime: string | null;
-}
-export function describeRuntime(platform: RuntimePlatform, constants: RuntimeConstants): RuntimeFacts {
-  const v = platform.constants?.reactNativeVersion;
-  const rn =
-    v && [v.major, v.minor, v.patch].every((n) => Number.isInteger(n))
-      ? `${v.major}.${v.minor}.${v.patch}${v.prerelease != null && v.prerelease !== '' ? `-${String(v.prerelease)}` : ''}`
-      : null;
-  return {
-    platform: platform.OS,
-    osVersion: String(platform.Version),
-    expoSdk: constants.expoConfig?.sdkVersion ?? null,
-    appOwnership: constants.appOwnership ?? null,
-    executionEnvironment: constants.executionEnvironment ?? null,
-    expoGoVersion: constants.expoVersion ?? null,
-    reactNativeRuntime: rn,
-  };
-}
+export { describeRuntime } from '@/config/runtimeFacts';
+export type { RuntimeConstants, RuntimeFacts, RuntimePlatform } from '@/config/runtimeFacts';
 
 export const CANARY_STATUSES = [301, 302, 307, 308] as const;
 export const FAKE = {

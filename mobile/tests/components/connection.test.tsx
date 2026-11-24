@@ -10,6 +10,7 @@ import { setRuntime } from '@/auth/runtime';
 import { authStatusStore } from '@/auth/statusStore';
 import { ORIGIN } from '../support/fakeBackend';
 import { enrolled, makeWorld } from '../support/harness';
+import { MATCHING_FACTS, TEST_ENTRY } from '../support/redirectFixtures';
 
 const APP = path.join(__dirname, '../../app');
 const DEV_CHIP = /Connected to development backend Dev backend/;
@@ -41,6 +42,30 @@ describe('demo mode stays the default', () => {
     await renderRouter(APP, { initialUrl: '/' });
     await screen.findAllByLabelText('Synthetic demo data. Not real records.');
     expect(screen.queryByLabelText(DEV_CHIP)).toBeNull();
+    expect(w.server.log).toHaveLength(0);
+  });
+});
+
+describe('native block on the connection screen', () => {
+  it('says authentication is not authorised first, and that redirect verification does not authorise anything', async () => {
+    const w = makeWorld({ platform: 'ios', facts: MATCHING_FACTS, registry: [TEST_ENTRY] });
+    setRuntime(w.rt);
+    await renderRouter(APP, { initialUrl: '/settings/connection' });
+    await screen.findByText('Connecting from this device is disabled');
+    expect(screen.getByText(/Reason: authenticated requests have not been authorised\./)).toBeTruthy();
+    expect(screen.getByText(/Redirect verification alone does not authorise access\./)).toBeTruthy();
+    expect(screen.getByText(/does not authorise authenticated requests\./)).toBeTruthy(); // the verified-redirect sentence
+    expect(screen.queryByLabelText('Enrollment code')).toBeNull();
+    expect(w.server.log).toHaveLength(0);
+  });
+  it('with no verified configuration it states that too', async () => {
+    const w = makeWorld({ platform: 'ios', registry: [] });
+    setRuntime(w.rt);
+    await renderRouter(APP, { initialUrl: '/settings/connection' });
+    await screen.findByText('Connecting from this device is disabled');
+    expect(
+      screen.getByText(/Redirect behaviour is not verified for this build: no verified configuration is recorded/),
+    ).toBeTruthy();
     expect(w.server.log).toHaveLength(0);
   });
 });

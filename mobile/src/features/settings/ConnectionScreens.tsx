@@ -8,6 +8,7 @@ import { useConnection } from '@/auth/hooks';
 import { defaultDeviceName, getRuntime } from '@/auth/runtime';
 import { userKey } from '@/auth/queryClient';
 import { useAuthReason } from '@/auth/statusStore';
+import { NATIVE_BLOCK_TEXT, REASON_TEXT, redirectRowText } from '@/config/transportGate';
 import {
   Banner,
   Button,
@@ -140,10 +141,15 @@ export function ConnectionScreen() {
       ) : null}
 
       {rt.nativeBlocked ? (
-        <Banner tone="warning" title="Connecting from this device is disabled">
-          This iPhone stays in synthetic demo mode: no enrollment code, token or request leaves the device until the
-          network transport has been verified on a physical device and that evidence has been reviewed.
-        </Banner>
+        <>
+          <Banner tone="warning" title="Connecting from this device is disabled">
+            This iPhone stays in synthetic demo mode: no enrollment code, token or request leaves the device.{' '}
+            {NATIVE_BLOCK_TEXT} Reason: {REASON_TEXT[rt.nativeBlockReason ?? 'authorisation_not_granted']}.
+          </Banner>
+          <Text variant="footnote" tone="secondary">
+            {redirectRowText(rt.redirectState)}
+          </Text>
+        </>
       ) : null}
 
       {!rt.nativeBlocked && (conn.status === 'unenrolled' || conn.status === 'expired') ? (

@@ -14,7 +14,14 @@ import {
   Row,
 } from '@/design';
 import { GATES } from '@/config/gates';
-import { NATIVE_GATE_STATUS, NATIVE_GATE_TITLE } from '@/config/transportGate';
+import {
+  NATIVE_BLOCK_TEXT,
+  NATIVE_GATE_STATUS,
+  NATIVE_GATE_TITLE,
+  REDIRECT_ROW_TITLE,
+  redirectRowText,
+  redirectVerificationState,
+} from '@/config/transportGate';
 import type { AppearancePreference } from '@/prefs/appearance';
 import { CanaryScreen } from './CanaryScreen';
 import { ConnectionScreen, SessionsScreen } from './ConnectionScreens';
@@ -85,6 +92,7 @@ export function AppearanceScreen() {
 }
 
 export function AboutScreen() {
+  const redirect = redirectVerificationState();
   return (
     <Screen>
       <SyntheticChip />
@@ -121,8 +129,24 @@ export function AboutScreen() {
           </Text>
         </Row>
         <Text variant="footnote" tone="secondary">
-          Until the redirect canary has been run on a physical device and reviewed, this iPhone sends no enrollment
-          code, refresh token or bearer token. Web testing is not affected.
+          {NATIVE_GATE_STATUS() === 'BLOCKED'
+            ? NATIVE_BLOCK_TEXT
+            : 'Authenticated requests are enabled by an approved verification.'}
+        </Text>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Text variant="callout" style={{ flex: 1 }}>
+            {REDIRECT_ROW_TITLE}
+          </Text>
+          <Text
+            variant="footnote"
+            tone={redirect.redirectVerified ? 'success' : 'secondary'}
+            style={{ fontWeight: '700' }}
+          >
+            {redirect.redirectVerified ? 'Verified' : 'Not verified'}
+          </Text>
+        </Row>
+        <Text variant="footnote" tone="secondary">
+          {redirectRowText(redirect)}
         </Text>
       </Card>
       <Text variant="footnote" tone="secondary">
