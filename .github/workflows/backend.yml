@@ -1,0 +1,137 @@
+name: backend
+
+# Backend CI foundation (S1). Runs the locked dev toolchain against the repository exactly as committed:
+#   ruff       lint and format check (rules from pyproject.toml, unchanged)
+#   mypy       strict type check (configuration from pyproject.toml, unchanged)
+#   pytest     the whole tests/ tree against a throwaway PostgreSQL service (pgvector image, schema from the repo's init script)
+#   docker     API image build and Compose validation with PLACEHOLDER values only
+# Four independent jobs so one failing check never hides another. Every job is enforced: a failure fails the run.
+# No LiteLLM gateway and no provider credentials: the live-gateway test keeps its existing skip (ABU_TEST_LITELLM_URL unset).
+# The credentials below are throwaway values for a container that exists only for this run.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'services/**'
+      - 'core/**'
+      - 'domain/**'
+      - 'agents/**'
+      - 'database/**'
+      - 'tests/**'
+      - 'infrastructure/**'
+      - 'alembic.ini'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/backend.yml'
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'services/**'
+      - 'core/**'
+      - 'domain/**'
+      - 'agents/**'
+      - 'database/**'
+      - 'tests/**'
+      - 'infrastructure/**'
+      - 'alembic.ini'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/backend.yml'
+
+permissions:
+  contents: read
+
+env:
+  CI: 1
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - name: Install locked dependencies (including the dev group)
+        run: uv sync --frozen
+      - name: Ruff lint
+        run: uv run --no-sync ruff check .
+      - name: Ruff format check
+        run: uv run --no-sync ruff format --check .
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - name: Install locked dependencies (including the dev group)
+        run: uv sync --frozen
+      - name: mypy
+        run: uv run --no-sync mypy
+
+  pytest:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: abu_admin
+          POSTGRES_PASSWORD: ci-admin-throwaway
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U abu_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGPASSWORD: ci-admin-throwaway
+      POSTGRES_USER: abu_admin
+      APP_DB_NAME: abu_ai
+      APP_DB_USER: abu_app
+      APP_DB_PASSWORD: ci-app-throwaway
+      LITELLM_DB_NAME: litellm
+      LITELLM_DB_USER: litellm
+      LITELLM_DB_PASSWORD: ci-litellm-throwaway
+      ABU_TEST_ADMIN_URL: postgresql+psycopg://abu_admin:ci-admin-throwaway@127.0.0.1:5432/postgres
+      ABU_TEST_DATABASE_URL: postgresql+psycopg://abu_app:ci-app-throwaway@127.0.0.1:5432/abu_ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - name: Install locked dependencies (including the dev group)
+        run: uv sync --frozen
+      - name: Create the application and LiteLLM databases with the repository init script
+        run: bash infrastructure/postgres/01-init.sh
+      - name: pytest (whole tests/ tree)
+        run: uv run --no-sync pytest -ra
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API image
+        run: docker build -f services/api/Dockerfile --target runtime -t abu-api:ci .
+      - name: Validate the Compose files with placeholder values
+        run: |
+          cat > "$RUNNER_TEMP/compose-placeholder.env" <<'EOF'
+          POSTGRES_ADMIN_USER=placeholder
+          POSTGRES_ADMIN_PASSWORD=placeholder
+          APP_DB_NAME=placeholder
+          APP_DB_USER=placeholder
+          APP_DB_PASSWORD=placeholder
+          LITELLM_DB_NAME=placeholder
+          LITELLM_DB_USER=placeholder
+          LITELLM_DB_PASSWORD=placeholder
+          LITELLM_MASTER_KEY=sk-placeholder
+          JWT_SECRET=placeholder-placeholder-placeholder-00
+          TOKEN_HASH_KEY=placeholder-placeholder-placeholder-11
+          EOF
+          docker compose --env-file "$RUNNER_TEMP/compose-placeholder.env" -f infrastructure/docker-compose.yml config --quiet
+          docker compose --env-file "$RUNNER_TEMP/compose-placeholder.env" -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml config --quiet
