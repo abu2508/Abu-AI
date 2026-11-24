@@ -1,10 +1,11 @@
 name: mobile
 
 on:
+  workflow_dispatch:
   pull_request:
     paths: ['mobile/**', '.github/workflows/mobile.yml']
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
     paths: ['mobile/**', '.github/workflows/mobile.yml']
 
 permissions:
