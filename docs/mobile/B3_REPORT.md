@@ -52,3 +52,6 @@ The new workflow's detection of a stale snapshot was demonstrated locally (secti
 4. The golden scenario freezes the clock by patching service clocks in the test process only; real-clock behaviour is covered by the existing suite.
 5. The workflow installs with `uv sync --frozen --no-dev`; its first run is the real test of that setup (result in section 6).
 6. `messaging.analyse.topics` are words from the other party's messages (existing behaviour, shared conversations only); the contract adds no exposure.
+
+## 11. Review outcome (recorded 2026-11-24)
+B3 formally approved (implementation commit `851213110a8e45f33ec8c2e7b22301ebc99772f0`). F1 closed: the datetime-slicing defect was reproduced only outside the real execution path, and the scheduled-block workflow succeeds through the registry and orchestrator; no separate fix is required. The `response_model` discrepancy is accepted; the acceptance criterion is **"no concrete enforced response model"** (the `-> Any` annotations make FastAPI report `typing.Any`, and no response validation or filtering was introduced).
