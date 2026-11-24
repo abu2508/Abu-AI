@@ -3,7 +3,11 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 const restrictedGlobals = [
-  { name: 'fetch', message: 'Network access belongs ONLY in src/api/transport.ts (explicit expo/fetch). See docs/mobile/M8.2_PLAN.md 9.2.' },
+  {
+    name: 'fetch',
+    message:
+      'Network access belongs ONLY in src/api/transport.ts (explicit expo/fetch). See docs/mobile/M8.2_PLAN.md 9.2.',
+  },
   { name: 'XMLHttpRequest', message: 'Network access belongs ONLY in src/api/transport.ts.' },
   { name: 'parseFloat', message: 'Money is a string; never use floating point for amounts (see src/lib/money.ts).' },
 ];
@@ -32,7 +36,10 @@ export default defineConfig([
               message: 'Use src/prefs (non-sensitive preferences only). Never store tokens or data.',
             },
             { name: 'expo-secure-store', message: 'Secrets are handled only in src/auth (M8.1).' },
-            { name: 'expo/fetch', message: 'Only src/api/transport.ts may import expo/fetch; everything else uses the runtime.' },
+            {
+              name: 'expo/fetch',
+              message: 'Only src/api/transport.ts may import expo/fetch; everything else uses the runtime.',
+            },
           ],
         },
       ],

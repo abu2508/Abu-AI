@@ -80,6 +80,11 @@ export function LiveAssistant() {
     },
     true,
   );
+  // The safety switch can change at any time: re-read it whenever Ask Abu opens, and after a refused run.
+  const refetchStatus = status.refetch;
+  useEffect(() => {
+    void refetchStatus();
+  }, [refetchStatus]);
   const labels = Object.fromEntries((workflows.data ?? []).map((w) => [w.name, w.description]));
   const sharedOnly = (shared.data ?? []).filter((c) => c.shared_with_assistant); // defence in depth: never offer a private conversation
   const paused = status.data?.kill_switch.active === true;
@@ -133,6 +138,7 @@ export function LiveAssistant() {
       const err = isApiError(e) ? e : null;
       setError(err);
       setPhase('done');
+      if (err?.code === 'kill_switch') void qc.invalidateQueries({ queryKey: userKey(rt.userId, 'home', 'status') });
       if (err?.code === 'conflict')
         timer.current = setTimeout(
           () => void qc.invalidateQueries({ queryKey: userKey(rt.userId, 'asks', 'runs') }),

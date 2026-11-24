@@ -26,7 +26,15 @@ PYEOF
   fi
   exit 0
 fi
-[ "$cmd" = "up" ] || { echo "usage: $0 up|down" >&2; exit 2; }
+if [ "$cmd" = "killswitch" ]; then   # killswitch activate|deactivate  (admin CLI against the throwaway database)
+  # shellcheck disable=SC1090
+  . "$STATE"
+  cd "$ROOT"; set -a; . "$ROOT/.env"; set +a
+  export ABU_ENV=test ABU_DATABASE_URL="postgresql+psycopg://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@127.0.0.1:5432/${ABU_CONTRACT_DB}"
+  export ABU_JWT_SECRET="$(head -c36 /dev/urandom | od -An -tx1 | tr -d ' \n')" ABU_TOKEN_HASH_KEY="$(head -c36 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  exec "$PY" -m services.admin kill-switch "${2:?activate|deactivate}" --reason "contract test"
+fi
+[ "$cmd" = "up" ] || { echo "usage: $0 up|down|killswitch activate|deactivate" >&2; exit 2; }
 
 cd "$ROOT"
 set -a; . "$ROOT/.env"; set +a
@@ -47,6 +55,7 @@ export ABU_TOKEN_HASH_KEY="$(head -c36 /dev/urandom | od -An -tx1 | tr -d ' \n')
 export ABU_MEMORY_KEK="$(head -c32 /dev/urandom | base64)"
 export ABU_LITELLM_BASE_URL="http://127.0.0.1:9"   # unreachable on purpose: no model is ever called
 export ABU_RATE_LIMIT_AUTH_PER_MINUTE=60            # headroom for the functional suite; the 429 test bursts past it
+export ABU_RATE_LIMIT_IP_PER_MINUTE=2000           # per-IP headroom: every local client shares 127.0.0.1; the per-USER limit (300/min) stays the real default
 
 "$PY" -c "
 from alembic import command
@@ -54,10 +63,16 @@ from alembic.config import Config
 cfg = Config('alembic.ini'); cfg.set_main_option('sqlalchemy.url', '$ADMIN/$DB'.replace('%','%%'))
 command.upgrade(cfg, 'head')" >/dev/null
 
+# Registry + mock agents: the orchestrator needs them (the default app uses the in-process mock model; no LiteLLM, no external call).
+"$PY" -m database.seed >/dev/null
+"$PY" -m services.admin orchestrator bootstrap-mock >/dev/null
+
 mkuser() { "$PY" -m services.admin create-user --name "$1" | grep -Eo '[0-9a-f]{8}-[0-9a-f-]{27}' | head -1; }
 mkcode() { "$PY" -m services.admin enroll --user "$1" --label "$2" | tail -1; }
 UA="$(mkuser "Contract User A (synthetic)")"
 UB="$(mkuser "Contract User B (synthetic)")"
+UH="$(mkuser "Home Data User (synthetic)")"
+UE="$(mkuser "Empty User (synthetic)")"
 
 nohup "$PY" -m uvicorn services.api.main:create_app --factory --host 127.0.0.1 --port "$PORT" >"$ROOT/mobile/.contract-api.log" 2>&1 &
 PID=$!
@@ -78,5 +93,13 @@ umask 077
   echo "ABU_CONTRACT_CODE_A5=$(mkcode "$UA" device-y)"
   echo "ABU_CONTRACT_CODE_B1=$(mkcode "$UB" phone)"
   echo "ABU_CONTRACT_CODE_B2=$(mkcode "$UB" phone-2)"
+  echo "ABU_CONTRACT_USER_H=$UH"
+  echo "ABU_CONTRACT_USER_E=$UE"
+  echo "ABU_CONTRACT_CODE_HSEED=$(mkcode "$UH" seeder)"
+  for n in 1 2 3 4; do echo "ABU_CONTRACT_CODE_H$n=$(mkcode "$UH" "home-$n")"; done
+  for n in 1 2 3; do echo "ABU_CONTRACT_CODE_E$n=$(mkcode "$UE" "empty-$n")"; done
 } >"$STATE"
+# synthetic data for the Home data user (through the backend's own HTTP API)
+HSEED="$(grep '^ABU_CONTRACT_CODE_HSEED=' "$STATE" | cut -d= -f2)"
+node "$ROOT/mobile/scripts/seed-contract-data.mjs" "http://127.0.0.1:$PORT" "$HSEED"
 echo "contract backend up on 127.0.0.1:$PORT (state in mobile/.contract.env, git-ignored)"

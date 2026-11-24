@@ -6,7 +6,8 @@ module.exports = {
   ...base,
   setupFilesAfterEnv: ['<rootDir>/jest.contract.setup.ts'],
   testMatch: ['<rootDir>/tests/contract/**/*.contract.ts'],
-  testTimeout: 60000,
+  testTimeout: 120000,
+  maxWorkers: 1, // one file at a time: the files share one backend, one IP and its rate limiters
   collectCoverageFrom: undefined,
   coverageThreshold: undefined,
 };

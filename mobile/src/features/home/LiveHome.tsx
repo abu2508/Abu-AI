@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -75,6 +75,13 @@ export function LiveHome() {
     true,
   );
   const all = [status, briefing, summary, insights, upcoming, inbox];
+  // Re-read the safety switch whenever Home comes into focus (it is the single source for the paused state).
+  const refetchStatus = status.refetch;
+  useFocusEffect(
+    React.useCallback(() => {
+      void refetchStatus();
+    }, [refetchStatus]),
+  );
 
   const limited = all.map((q) => q.error).find((e) => isApiError(e) && e.code === 'rate_limited');
   const wait = useCountdown(
@@ -150,7 +157,9 @@ export function LiveHome() {
                 <ListRow key={x.task_id} title={x.title} subtitle={`${hhmm(x.start)} to ${hhmm(x.end)}`} />
               ))}
               <Text variant="footnote" tone="secondary">
-                {b.events.length} events · {b.habits_open.length} habits open · {b.reminders_due.length} reminders due
+                {b.events.length} {b.events.length === 1 ? 'event' : 'events'} · {b.habits_open.length}{' '}
+                {b.habits_open.length === 1 ? 'habit' : 'habits'} open · {b.reminders_due.length}{' '}
+                {b.reminders_due.length === 1 ? 'reminder' : 'reminders'} due
               </Text>
               {b.goals_needing_attention.map((g) => (
                 <Text key={g.id} variant="footnote" tone="warning">

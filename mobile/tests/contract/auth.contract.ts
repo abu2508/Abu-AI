@@ -46,6 +46,7 @@ function device(opts: { dropNext?: RegExp[] } = {}): Device {
     },
     approved: () => [{ id: 'local', label: 'Local synthetic', origin: URL_!, kind: 'development' }],
     debug: true, // loopback HTTP is allowed in a debug build only
+    platform: 'web', // the contract tests act as a web client: the native credential gate is false by design
     credentials: createCredentialVault(keychain),
     queryClient: createQueryClient(),
     tokens: createTokenVault(() => Date.now() + clock.skewMs),
@@ -188,5 +189,7 @@ suite('contract: mobile auth runtime vs the real backend', () => {
     expect(limited).not.toBeNull();
     expect(limited!.retryAfterSeconds).toBeGreaterThan(0);
     expect(d.keychain.data.size).toBe(0);
+    // leave the shared per-IP limiter clean for the other contract files (the burst above exhausted it)
+    await new Promise((r) => setTimeout(r, (limited!.retryAfterSeconds ?? 1) * 1000 + 500));
   });
 });

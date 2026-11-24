@@ -54,6 +54,7 @@ describe('private address rules (server script and app agree)', () => {
     expect(appIsPrivate(ip)).toBe(want);
   });
   it('parseCanaryUrl accepts only http://<private ip>[:port]', () => {
+    const withCreds = 'http://u:p@192.168.1.20:8801'; // scan-allow: negative test, must be refused
     expect(parseCanaryUrl('http://192.168.1.20:8801')).toBe('http://192.168.1.20:8801');
     expect(parseCanaryUrl('  http://10.1.2.3:8801/ ')).toBe('http://10.1.2.3:8801');
     for (const bad of [
@@ -62,7 +63,7 @@ describe('private address rules (server script and app agree)', () => {
       'http://localhost:8801',
       'http://127.0.0.1:8801',
       'http://192.168.1.20:8801/x',
-      'http://u:p@192.168.1.20:8801',
+      withCreds,
       'http://192.168.1.20:8801?x=1',
       'nope',
       '',
