@@ -80,12 +80,48 @@ For each of 301, 302, 307 and 308: `appSaw.httpStatus` equals the status, `appSa
 ```
 There is **no `B  RECEIVED` line**: the second origin received nothing, and the first origin received the fake credentials (`authorization:true`, 88 bytes) for all four statuses. Phone and server agree. The phone's `generatedAt` (18:20:25.723Z) precedes the server's first line by about 255 ms, consistent with two devices whose clocks differ slightly. The console output was supplied as text from the start of the canary's output; the start-up banner is omitted above except that it showed the canary bound to the PC's private LAN address.
 
-### 7.2a Still not supplied for this rerun (not recorded as fact)
-- The repository commit tested and the Node version for this run.
-- The Expo Go version from its Settings tab for this run (earlier reported as 58.0.5).
-- Confirmation that the firewall rule was removed.
+### 7.2a Provenance items supplied after the rerun (owner-supplied text; see section 8)
+The repository commit, Node version, Expo Go marketing version and the firewall cleanup were supplied later by the owner and are recorded in section 8.
 
 ### 7.3 Notes
 - The new fields are confirmed readable in Expo Go SDK 58: SDK 58.0.0, React Native runtime 0.88.0, `storeClient`, iOS 27.2.
 - Owner approved renaming `expoGoVersion` to `expoGoBuild` (the value above is a build identifier, not 58.0.5) and keeping a separate `expoGoMarketingVersion`, recorded by hand from Expo Go's Settings screen and never derived from the build value. The app now reports `expoGoMarketingVersion: null`. The run above used the old field name, `expoGoVersion`.
 - Scope is unchanged from sections 5 and 6: redirect behaviour only, one device, Expo Go only. It does not authorise authenticated requests and does not clear any production security gate (G1-G4).
+
+## 8. Build provenance of the rerun in section 7 (R11) and the proposed registry entry (NOT applied)
+Recorded from output and text the owner supplied. Claude did not run any of it.
+
+```
+Provenance environment: expo-go
+Provenance repository commit: ca9cff0b90eecc348ccf486b71337c516557bfeb
+Provenance Expo Go marketing version: 58.0.5
+Provenance Expo Go build: 1017894
+```
+| Item | Value | Source |
+|---|---|---|
+| Repository commit of the Windows checkout | `ca9cff0b90eecc348ccf486b71337c516557bfeb` (contains commit 1, `e4f6331`, which adds the runtime facts) | owner's `git log -1 --format=%H` in `~\Abu-AI\mobile`. The checkout was not updated between the run and this output; the `mobile` code is identical in later commits up to `998e29f` |
+| Node on the PC | `v22.23.5` | owner's `node --version` |
+| Expo Go marketing version | `58.0.5` | read by the owner from Expo Go's Settings tab; recorded by hand, never derived from the build value |
+| Expo Go build identifier | `1017894` | reported by the app (`expoGoBuild`; the rerun's JSON used the old name `expoGoVersion`) |
+| Native runtime | React Native `0.88.0`, Expo SDK `58.0.0`, `executionEnvironment` `storeClient`, iOS `27.2` (iPhone 17) | the app's JSON in section 7.1 |
+| Repository packages | `expo` `58.0.26`, `react-native` `0.88.1` (the app JavaScript; differs from the native runtime `0.88.0`, which belongs to Expo Go) | `package.json` pins |
+| Firewall cleanup | The temporary rule "Abu AI redirect canary (temporary)" (inbound, Private profile) was still present when checked; the owner removed it, and `Get-NetFirewallRule -DisplayName "*canary*"` then printed nothing, as did `Get-NetTCPConnection -LocalPort 8801,8802,8081 -State Listen` | owner's PowerShell output |
+| Playwright E2E (separate, unrelated to the canary) | Reported by Claude after commits 2 and 3: only the last 30 lines of its output were retained, all PASS; the complete run is **not** independently confirmed | this evidence record |
+
+Proposed entry (**not applied**; `redirectVerifications.json` stays `[]` until the owner separately approves commit 4):
+```json
+{
+  "id": "ios-expo-go-sdk58-2026-11-24",
+  "scope": "redirect-behaviour-only",
+  "platform": "ios",
+  "environment": "expo-go",
+  "expoSdk": "58.0.0",
+  "reactNativeRuntime": "0.88.0",
+  "iosMajor": 27,
+  "buildPins": { "expo": "58.0.26", "react-native": "0.88.1" },
+  "canary": "301, 302, 307, 308: PASS, second origin received nothing",
+  "evidence": "docs/mobile/reports/REDIRECT_CANARY_EVIDENCE.md",
+  "verifiedOn": "2026-11-24"
+}
+```
+What the entry would mean: for iOS 27.x in Expo Go with SDK 58.0.0 and native React Native 0.88.0, the redirect canary passed for POST with 301, 302, 307 and 308 on one iPhone over plain HTTP on a private network. It says **nothing** about authentication, Android, other builds, HTTPS, other methods or other redirect scenarios (R1, R4, R5, R8 stay NOT MET), and with `NATIVE_AUTH_TRANSPORT_VERIFIED` false it changes no behaviour. The entry matches the evidence of **section 7 (the rerun)**, `generatedAt` 2026-11-24T18:20:25.723Z; section 2 (the first run, SDK 58.0.0 too) did not record the runtime facts.
