@@ -1,0 +1,3101 @@
+{
+ "err.401.garbled": {
+  "body": {
+   "detail": "invalid credentials"
+  },
+  "headers": {
+   "content-type": "application/json",
+   "www-authenticate": "Bearer"
+  },
+  "status": 401
+ },
+ "err.401.no_token": {
+  "body": {
+   "detail": "invalid credentials"
+  },
+  "headers": {
+   "content-type": "application/json",
+   "www-authenticate": "Bearer"
+  },
+  "status": 401
+ },
+ "err.401.orchestrator": {
+  "body": {
+   "detail": "invalid credentials"
+  },
+  "headers": {
+   "content-type": "application/json",
+   "www-authenticate": "Bearer"
+  },
+  "status": 401
+ },
+ "err.404.coach": {
+  "body": {
+   "error": {
+    "code": "not_found",
+    "message": "not found"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 404
+ },
+ "err.404.finance.account": {
+  "body": {
+   "error": {
+    "code": "not_found",
+    "message": "account not found"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 404
+ },
+ "err.422.finance.category": {
+  "body": {
+   "error": {
+    "code": "invalid_category",
+    "message": "unknown category"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.422.finance.credit_limit": {
+  "body": {
+   "error": {
+    "code": "credit_limit_required",
+    "message": "a credit card needs a credit limit"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.422.invalid_request": {
+  "body": {
+   "error": {
+    "code": "invalid_request",
+    "message": "message must be 1-4000 characters"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.422.validation.extra": {
+  "body": {
+   "detail": [
+    {
+     "input": "x",
+     "loc": [
+      "body",
+      "user_id"
+     ],
+     "msg": "Extra inputs are not permitted",
+     "type": "extra_forbidden"
+    }
+   ]
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.422.validation.month": {
+  "body": {
+   "detail": [
+    {
+     "ctx": {
+      "le": 12
+     },
+     "input": "13",
+     "loc": [
+      "query",
+      "month"
+     ],
+     "msg": "Input should be less than or equal to 12",
+     "type": "less_than_equal"
+    }
+   ]
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.422.validation.run": {
+  "body": {
+   "detail": [
+    {
+     "ctx": {
+      "min_length": 1
+     },
+     "input": "",
+     "loc": [
+      "body",
+      "message"
+     ],
+     "msg": "String should have at least 1 character",
+     "type": "string_too_short"
+    }
+   ]
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 422
+ },
+ "err.503.service_unavailable": {
+  "body": {
+   "detail": "service unavailable"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 503
+ },
+ "idem.conflict": {
+  "body": {
+   "error": {
+    "code": "idempotency_conflict",
+    "message": "this Idempotency-Key was used with a different request"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 409
+ },
+ "idem.first": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.loans": {
+     "loans": [
+      {
+       "annual_rate_pct": "12.000",
+       "emi": "8884.88",
+       "id": "<uuid-16>",
+       "installments_paid_per_schedule": 1,
+       "installments_total": 12,
+       "interest_paid_per_schedule": "1000.00",
+       "label": "Demo car loan (demo)",
+       "next_due": "2026-12-05",
+       "next_emi": "8884.88",
+       "outstanding_principal": "92115.12",
+       "principal": "100000.00",
+       "status": "active",
+       "tenor_months": 12,
+       "total_interest": "6618.53"
+      }
+     ]
+    },
+    "finance.upcoming": {
+     "upcoming": [
+      {
+       "amount": "499.00",
+       "due": "2026-11-30",
+       "kind": "subscription",
+       "label": "Demo streaming (demo)"
+      },
+      {
+       "amount": "8884.88",
+       "due": "2026-12-05",
+       "kind": "emi",
+       "label": "Demo car loan (demo)"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-79>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.loans] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-78>",
+   "status": "completed",
+   "summary": "Demo car loan (demo): outstanding ₹92115.12, EMI ₹8884.88, next due 2026-12-05.\nSUBSCRIPTION Demo streaming (demo): ₹499.00 due 2026-11-30.\nEMI Demo car loan (demo): ₹8884.88 due 2026-12-05.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 339,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.loans"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "idem.replay": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.loans": {
+     "loans": [
+      {
+       "annual_rate_pct": "12.000",
+       "emi": "8884.88",
+       "id": "<uuid-16>",
+       "installments_paid_per_schedule": 1,
+       "installments_total": 12,
+       "interest_paid_per_schedule": "1000.00",
+       "label": "Demo car loan (demo)",
+       "next_due": "2026-12-05",
+       "next_emi": "8884.88",
+       "outstanding_principal": "92115.12",
+       "principal": "100000.00",
+       "status": "active",
+       "tenor_months": 12,
+       "total_interest": "6618.53"
+      }
+     ]
+    },
+    "finance.upcoming": {
+     "upcoming": [
+      {
+       "amount": "499.00",
+       "due": "2026-11-30",
+       "kind": "subscription",
+       "label": "Demo streaming (demo)"
+      },
+      {
+       "amount": "8884.88",
+       "due": "2026-12-05",
+       "kind": "emi",
+       "label": "Demo car loan (demo)"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-79>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": true,
+   "reply": "[mock:finance.loans] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-78>",
+   "status": "completed",
+   "summary": "Demo car loan (demo): outstanding ₹92115.12, EMI ₹8884.88, next due 2026-12-05.\nSUBSCRIPTION Demo streaming (demo): ₹499.00 due 2026-11-30.\nEMI Demo car loan (demo): ₹8884.88 due 2026-12-05.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 339,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.loans"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "killswitch.coach.briefing": {
+  "body": {
+   "date": "2026-11-24",
+   "events": [
+    {
+     "all_day": false,
+     "end": "2026-11-24T15:00:00+05:30",
+     "id": "<uuid-1>",
+     "reminder_minutes": 10,
+     "source": "manual",
+     "start": "2026-11-24T14:00:00+05:30",
+     "title": "Demo stand-up (demo)"
+    }
+   ],
+   "goals_needing_attention": [],
+   "habits_open": [
+    {
+     "current_streak": 3,
+     "id": "<uuid-5>",
+     "title": "Meditate (demo)"
+    },
+    {
+     "current_streak": 0,
+     "id": "<uuid-6>",
+     "title": "Long walk (demo)"
+    }
+   ],
+   "mood_trend": {
+    "avg_energy": 3.0,
+    "avg_mood": 4.0,
+    "checkins": 1
+   },
+   "plan": {
+    "blocks": [
+     {
+      "end": "2026-11-24T13:00:00+05:30",
+      "score": 95,
+      "start": "2026-11-24T12:00:00+05:30",
+      "task_id": "<uuid-2>",
+      "title": "Write demo report (demo)"
+     },
+     {
+      "end": "2026-11-24T13:20:00+05:30",
+      "score": 71,
+      "start": "2026-11-24T13:00:00+05:30",
+      "task_id": "<uuid-3>",
+      "title": "Reply to demo emails (demo)"
+     },
+     {
+      "end": "2026-11-24T13:50:00+05:30",
+      "score": 30,
+      "start": "2026-11-24T13:20:00+05:30",
+      "task_id": "<uuid-4>",
+      "title": "Review demo budget (demo)"
+     }
+    ],
+    "free_minutes": 280,
+    "overloaded": false,
+    "planned_minutes": 110,
+    "unscheduled": []
+   },
+   "reminders_due": [
+    {
+     "event_id": null,
+     "id": "<uuid-7>",
+     "remind_at": "2026-11-24T05:00:00+00:00",
+     "task_id": null,
+     "text": "Demo reminder (demo)"
+    }
+   ],
+   "streaks_at_risk": [
+    "Meditate (demo)"
+   ]
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "killswitch.finance.summary": {
+  "body": {
+   "end": "2026-11-30",
+   "expense": "36210.00",
+   "expense_by_category": [
+    [
+     "rent",
+     "18000.00"
+    ],
+    [
+     "shopping",
+     "12000.00"
+    ],
+    [
+     "dining",
+     "4379.50"
+    ],
+    [
+     "groceries",
+     "1830.50"
+    ]
+   ],
+   "income": "50000.00",
+   "income_by_category": [
+    [
+     "salary",
+     "50000.00"
+    ]
+   ],
+   "net": "13790.00",
+   "pending_review_count": 0,
+   "savings_rate_pct": "27.58",
+   "start": "2026-11-01"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "killswitch.run": {
+  "body": {
+   "error": {
+    "code": "kill_switch_active",
+    "message": "execution is currently disabled"
+   }
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 503
+ },
+ "route.a.coach.briefing": {
+  "body": {
+   "date": "2026-11-24",
+   "events": [
+    {
+     "all_day": false,
+     "end": "2026-11-24T15:00:00+05:30",
+     "id": "<uuid-1>",
+     "reminder_minutes": 10,
+     "source": "manual",
+     "start": "2026-11-24T14:00:00+05:30",
+     "title": "Demo stand-up (demo)"
+    }
+   ],
+   "goals_needing_attention": [],
+   "habits_open": [
+    {
+     "current_streak": 3,
+     "id": "<uuid-5>",
+     "title": "Meditate (demo)"
+    },
+    {
+     "current_streak": 0,
+     "id": "<uuid-6>",
+     "title": "Long walk (demo)"
+    }
+   ],
+   "mood_trend": {
+    "avg_energy": 3.0,
+    "avg_mood": 4.0,
+    "checkins": 1
+   },
+   "plan": {
+    "blocks": [
+     {
+      "end": "2026-11-24T13:00:00+05:30",
+      "score": 95,
+      "start": "2026-11-24T12:00:00+05:30",
+      "task_id": "<uuid-2>",
+      "title": "Write demo report (demo)"
+     },
+     {
+      "end": "2026-11-24T13:20:00+05:30",
+      "score": 71,
+      "start": "2026-11-24T13:00:00+05:30",
+      "task_id": "<uuid-3>",
+      "title": "Reply to demo emails (demo)"
+     },
+     {
+      "end": "2026-11-24T13:50:00+05:30",
+      "score": 30,
+      "start": "2026-11-24T13:20:00+05:30",
+      "task_id": "<uuid-4>",
+      "title": "Review demo budget (demo)"
+     }
+    ],
+    "free_minutes": 280,
+    "overloaded": false,
+    "planned_minutes": 110,
+    "unscheduled": []
+   },
+   "reminders_due": [
+    {
+     "event_id": null,
+     "id": "<uuid-7>",
+     "remind_at": "2026-11-24T05:00:00+00:00",
+     "task_id": null,
+     "text": "Demo reminder (demo)"
+    }
+   ],
+   "streaks_at_risk": [
+    "Meditate (demo)"
+   ]
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.a.finance.insights": {
+  "body": [
+   {
+    "code": "budget_exceeded",
+    "params": {
+     "category": "groceries",
+     "limit": "1000.00",
+     "spent": "1830.50"
+    },
+    "severity": "alert",
+    "text": "You are over your groceries budget: ₹1830.50 against ₹1000.00."
+   },
+   {
+    "code": "category_increase",
+    "params": {
+     "category": "groceries",
+     "change_pct": "83.05",
+     "current": "1830.50",
+     "previous": "1000.00"
+    },
+    "severity": "warning",
+    "text": "groceries spending rose 83.05% (₹1000.00 to ₹1830.50)."
+   },
+   {
+    "code": "unusually_large_expense",
+    "params": {
+     "amount": "18000.00",
+     "date": "2026-11-03",
+     "typical": "799.50"
+    },
+    "severity": "warning",
+    "text": "A ₹18000.00 expense on 2026-11-03 is well above your typical ₹799.50."
+   },
+   {
+    "code": "top_category",
+    "params": {
+     "amount": "18000.00",
+     "category": "rent",
+     "share_pct": "49.71"
+    },
+    "severity": "info",
+    "text": "Your biggest spending category is rent: ₹18000.00 (49.71% of spending)."
+   },
+   {
+    "code": "upcoming_due",
+    "params": {
+     "amount": "499.00",
+     "due": "2026-11-30",
+     "kind": "subscription",
+     "label": "Demo streaming (demo)"
+    },
+    "severity": "info",
+    "text": "subscription of ₹499.00 is due on 2026-11-30."
+   }
+  ],
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.a.finance.summary": {
+  "body": {
+   "end": "2026-11-30",
+   "expense": "36210.00",
+   "expense_by_category": [
+    [
+     "rent",
+     "18000.00"
+    ],
+    [
+     "shopping",
+     "12000.00"
+    ],
+    [
+     "dining",
+     "4379.50"
+    ],
+    [
+     "groceries",
+     "1830.50"
+    ]
+   ],
+   "income": "50000.00",
+   "income_by_category": [
+    [
+     "salary",
+     "50000.00"
+    ]
+   ],
+   "net": "13790.00",
+   "pending_review_count": 0,
+   "savings_rate_pct": "27.58",
+   "start": "2026-11-01"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.a.finance.summary.oct": {
+  "body": {
+   "end": "2026-10-31",
+   "expense": "19000.00",
+   "expense_by_category": [
+    [
+     "rent",
+     "18000.00"
+    ],
+    [
+     "groceries",
+     "1000.00"
+    ]
+   ],
+   "income": "50000.00",
+   "income_by_category": [
+    [
+     "salary",
+     "50000.00"
+    ]
+   ],
+   "net": "31000.00",
+   "pending_review_count": 0,
+   "savings_rate_pct": "62.00",
+   "start": "2026-10-01"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.a.finance.upcoming": {
+  "body": [
+   {
+    "amount": "499.00",
+    "due": "2026-11-30",
+    "kind": "subscription",
+    "label": "Demo streaming (demo)"
+   },
+   {
+    "amount": "8884.88",
+    "due": "2026-12-05",
+    "kind": "emi",
+    "label": "Demo car loan (demo)"
+   }
+  ],
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.a.finance.upcoming.90": {
+  "body": [
+   {
+    "amount": "499.00",
+    "due": "2026-11-30",
+    "kind": "subscription",
+    "label": "Demo streaming (demo)"
+   },
+   {
+    "amount": "8884.88",
+    "due": "2026-12-05",
+    "kind": "emi",
+    "label": "Demo car loan (demo)"
+   }
+  ],
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.b.coach.briefing": {
+  "body": {
+   "date": "2026-11-24",
+   "events": [],
+   "goals_needing_attention": [],
+   "habits_open": [],
+   "mood_trend": {
+    "avg_energy": null,
+    "avg_mood": null,
+    "checkins": 0
+   },
+   "plan": {
+    "blocks": [],
+    "free_minutes": 360,
+    "overloaded": false,
+    "planned_minutes": 0,
+    "unscheduled": []
+   },
+   "reminders_due": [],
+   "streaks_at_risk": []
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.b.finance.insights": {
+  "body": [],
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.b.finance.summary": {
+  "body": {
+   "end": "2026-11-30",
+   "expense": "0.00",
+   "expense_by_category": [],
+   "income": "0.00",
+   "income_by_category": [],
+   "net": "0.00",
+   "pending_review_count": 0,
+   "savings_rate_pct": null,
+   "start": "2026-11-01"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.b.finance.summary.oct": {
+  "body": {
+   "end": "2026-10-31",
+   "expense": "0.00",
+   "expense_by_category": [],
+   "income": "0.00",
+   "income_by_category": [],
+   "net": "0.00",
+   "pending_review_count": 0,
+   "savings_rate_pct": null,
+   "start": "2026-10-01"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "route.b.finance.upcoming": {
+  "body": [],
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.clarify.a": {
+  "body": {
+   "agent_id": "general_agent",
+   "clarification_question": "Could you tell me a bit more about what you need? I can help with your finances, with drafting replies to messages, and with planning your day.",
+   "confidence": 0.3,
+   "context": {
+    "basis": null,
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": null,
+   "error": null,
+   "execution_id": "<uuid-77>",
+   "intent": "clarification_needed",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": null,
+   "reply_expired": false,
+   "run_id": "<uuid-76>",
+   "status": "clarification_needed",
+   "summary": null,
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 0,
+    "cost_inr": "0",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "steps": 0
+   },
+   "warnings": [],
+   "workflow": null
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.briefing.a": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.briefing": {
+     "date": "2026-11-24",
+     "events": [
+      {
+       "all_day": false,
+       "end": "2026-11-24T15:00:00+05:30",
+       "id": "<uuid-1>",
+       "reminder_minutes": 10,
+       "source": "manual",
+       "start": "2026-11-24T14:00:00+05:30",
+       "title": "Demo stand-up (demo)"
+      }
+     ],
+     "goals_needing_attention": [],
+     "habits_open": [
+      {
+       "current_streak": 3,
+       "id": "<uuid-5>",
+       "title": "Meditate (demo)"
+      },
+      {
+       "current_streak": 0,
+       "id": "<uuid-6>",
+       "title": "Long walk (demo)"
+      }
+     ],
+     "mood_trend": {
+      "avg_energy": 3.0,
+      "avg_mood": 4.0,
+      "checkins": 1
+     },
+     "plan": {
+      "blocks": [
+       {
+        "end": "2026-11-24T13:00:00+05:30",
+        "score": 95,
+        "start": "2026-11-24T12:00:00+05:30",
+        "task_id": "<uuid-2>",
+        "title": "Write demo report (demo)"
+       },
+       {
+        "end": "2026-11-24T13:20:00+05:30",
+        "score": 71,
+        "start": "2026-11-24T13:00:00+05:30",
+        "task_id": "<uuid-3>",
+        "title": "Reply to demo emails (demo)"
+       },
+       {
+        "end": "2026-11-24T13:50:00+05:30",
+        "score": 30,
+        "start": "2026-11-24T13:20:00+05:30",
+        "task_id": "<uuid-4>",
+        "title": "Review demo budget (demo)"
+       }
+      ],
+      "free_minutes": 280,
+      "overloaded": false,
+      "planned_minutes": 110,
+      "unscheduled": []
+     },
+     "reminders_due": [
+      {
+       "event_id": null,
+       "id": "<uuid-7>",
+       "remind_at": "2026-11-24T05:00:00+00:00",
+       "task_id": null,
+       "text": "Demo reminder (demo)"
+      }
+     ],
+     "streaks_at_risk": [
+      "Meditate (demo)"
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-25>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.briefing] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-24>",
+   "status": "completed",
+   "summary": "1 event(s), 3 planned task(s), 2 habit(s) still open.\nStreak at risk: Meditate (demo).",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 516,
+    "output_tokens": 55,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.briefing"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.briefing.b": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.briefing": {
+     "date": "2026-11-24",
+     "events": [],
+     "goals_needing_attention": [],
+     "habits_open": [],
+     "mood_trend": {
+      "avg_energy": null,
+      "avg_mood": null,
+      "checkins": 0
+     },
+     "plan": {
+      "blocks": [],
+      "free_minutes": 360,
+      "overloaded": false,
+      "planned_minutes": 0,
+      "unscheduled": []
+     },
+     "reminders_due": [],
+     "streaks_at_risk": []
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-51>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.briefing] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-50>",
+   "status": "completed",
+   "summary": "0 event(s), 0 planned task(s), 0 habit(s) still open.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 253,
+    "output_tokens": 55,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.briefing"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.goals.a": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.goals": {
+     "goals": [
+      {
+       "category": "health",
+       "id": "<uuid-30>",
+       "progress_days_left": 26336,
+       "progress_expected_pct": 0,
+       "progress_pct": 0,
+       "progress_state": "on_track",
+       "status": "active",
+       "target_date": "2099-01-01",
+       "title": "Run a demo 10k (demo)"
+      },
+      {
+       "category": "learning",
+       "id": "<uuid-31>",
+       "progress_days_left": null,
+       "progress_expected_pct": null,
+       "progress_pct": 0,
+       "progress_state": "no_deadline",
+       "status": "active",
+       "target_date": null,
+       "title": "Read demo books (demo)"
+      }
+     ]
+    },
+    "coach.progress": {
+     "goals": [
+      {
+       "progress_pct": 0,
+       "state": "on_track",
+       "title": "Run a demo 10k (demo)"
+      },
+      {
+       "progress_pct": 0,
+       "state": "no_deadline",
+       "title": "Read demo books (demo)"
+      }
+     ],
+     "habits": [
+      {
+       "completion_rate_30d": 10.0,
+       "current_streak": 3,
+       "title": "Meditate (demo)"
+      },
+      {
+       "completion_rate_30d": null,
+       "current_streak": 0,
+       "title": "Long walk (demo)"
+      }
+     ],
+     "mood_trend": {
+      "avg_energy": 3.0,
+      "avg_mood": 4.0,
+      "checkins": 1
+     },
+     "tasks_completed": 0,
+     "tasks_open": 3,
+     "window_days": 7
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-29>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.goals] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-28>",
+   "status": "completed",
+   "summary": "Run a demo 10k (demo): 0% (on_track).\nRead demo books (demo): 0% (no_deadline).\nLast 7 days: 0 task(s) completed, 3 open.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 416,
+    "output_tokens": 54,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "coach.goals"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.goals.b": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.goals": {
+     "goals": []
+    },
+    "coach.progress": {
+     "goals": [],
+     "habits": [],
+     "mood_trend": {
+      "avg_energy": null,
+      "avg_mood": null,
+      "checkins": 0
+     },
+     "tasks_completed": 0,
+     "tasks_open": 0,
+     "window_days": 7
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-55>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.goals] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-54>",
+   "status": "completed",
+   "summary": "No goals yet.\nLast 7 days: 0 task(s) completed, 0 open.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 223,
+    "output_tokens": 54,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "coach.goals"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.habits.a": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.habits": {
+     "habits": [
+      {
+       "cadence": "daily",
+       "completion_rate_30d": 10.0,
+       "current_streak": 3,
+       "done_today": false,
+       "due_today": true,
+       "id": "<uuid-5>",
+       "longest_streak": 3,
+       "target_per_week": 7,
+       "title": "Meditate (demo)",
+       "unit": "days"
+      },
+      {
+       "cadence": "weekly",
+       "completion_rate_30d": null,
+       "current_streak": 0,
+       "done_today": false,
+       "id": "<uuid-6>",
+       "target_per_week": 3,
+       "this_week": 0,
+       "title": "Long walk (demo)",
+       "unit": "weeks"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-33>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.habits] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-32>",
+   "status": "completed",
+   "summary": "Meditate (demo): streak 3.\nLong walk (demo): streak 0.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 294,
+    "output_tokens": 54,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.habits"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.habits.b": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.habits": {
+     "habits": []
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-57>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.habits] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-56>",
+   "status": "completed",
+   "summary": "No habits yet.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 187,
+    "output_tokens": 54,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.habits"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.plan.a": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.plan": {
+     "blocks": [
+      {
+       "end": "2026-11-24T13:00:00+05:30",
+       "score": 95,
+       "start": "2026-11-24T12:00:00+05:30",
+       "task_id": "<uuid-2>",
+       "title": "Write demo report (demo)"
+      },
+      {
+       "end": "2026-11-24T13:20:00+05:30",
+       "score": 71,
+       "start": "2026-11-24T13:00:00+05:30",
+       "task_id": "<uuid-3>",
+       "title": "Reply to demo emails (demo)"
+      },
+      {
+       "end": "2026-11-24T13:50:00+05:30",
+       "score": 30,
+       "start": "2026-11-24T13:20:00+05:30",
+       "task_id": "<uuid-4>",
+       "title": "Review demo budget (demo)"
+      }
+     ],
+     "date": "2026-11-24",
+     "deferred": [],
+     "events": [
+      {
+       "all_day": false,
+       "end": "2026-11-24T15:00:00+05:30",
+       "id": "<uuid-1>",
+       "reminder_minutes": 10,
+       "source": "manual",
+       "start": "2026-11-24T14:00:00+05:30",
+       "title": "Demo stand-up (demo)"
+      }
+     ],
+     "free_minutes": 280,
+     "overloaded": false,
+     "planned_minutes": 110,
+     "unscheduled": []
+    },
+    "coach.progress": {
+     "goals": [
+      {
+       "progress_pct": 0,
+       "state": "on_track",
+       "title": "Run a demo 10k (demo)"
+      },
+      {
+       "progress_pct": 0,
+       "state": "no_deadline",
+       "title": "Read demo books (demo)"
+      }
+     ],
+     "habits": [
+      {
+       "completion_rate_30d": 10.0,
+       "current_streak": 3,
+       "title": "Meditate (demo)"
+      },
+      {
+       "completion_rate_30d": null,
+       "current_streak": 0,
+       "title": "Long walk (demo)"
+      }
+     ],
+     "mood_trend": {
+      "avg_energy": 3.0,
+      "avg_mood": 4.0,
+      "checkins": 1
+     },
+     "tasks_completed": 0,
+     "tasks_open": 3,
+     "window_days": 7
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-35>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.daily_plan.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-34>",
+   "status": "completed",
+   "summary": "12:00-13:00 Write demo report (demo)\n13:00-13:20 Reply to demo emails (demo)\n13:20-13:50 Review demo budget (demo)\nLast 7 days: 0 task(s) completed, 3 open.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 502,
+    "output_tokens": 57,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "coach.daily_plan.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.plan.b": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.plan": {
+     "blocks": [],
+     "date": "2026-11-24",
+     "deferred": [],
+     "events": [],
+     "free_minutes": 360,
+     "overloaded": false,
+     "planned_minutes": 0,
+     "unscheduled": []
+    },
+    "coach.progress": {
+     "goals": [],
+     "habits": [],
+     "mood_trend": {
+      "avg_energy": null,
+      "avg_mood": null,
+      "checkins": 0
+     },
+     "tasks_completed": 0,
+     "tasks_open": 0,
+     "window_days": 7
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-59>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.daily_plan.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-58>",
+   "status": "completed",
+   "summary": "Nothing is scheduled.\nLast 7 days: 0 task(s) completed, 0 open.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 253,
+    "output_tokens": 57,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "coach.daily_plan.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.review.a": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.review": {
+     "carry_over": [
+      {
+       "due_date": "2026-11-24",
+       "id": "<uuid-2>",
+       "title": "Write demo report (demo)"
+      },
+      {
+       "due_date": "2026-11-23",
+       "id": "<uuid-3>",
+       "title": "Reply to demo emails (demo)"
+      }
+     ],
+     "date": "2026-11-24",
+     "habits_done": 0,
+     "habits_due": 2,
+     "mood_trend": {
+      "avg_energy": 3.0,
+      "avg_mood": 4.0,
+      "checkins": 1
+     },
+     "streaks": [
+      {
+       "current_streak": 3,
+       "title": "Meditate (demo)"
+      },
+      {
+       "current_streak": 0,
+       "title": "Long walk (demo)"
+      }
+     ],
+     "tasks_completed_today": 0,
+     "tomorrow": {
+      "first_events": [],
+      "top_tasks": [
+       {
+        "start": "2026-11-25T09:00:00+05:30",
+        "title": "Write demo report (demo)"
+       },
+       {
+        "start": "2026-11-25T10:00:00+05:30",
+        "title": "Reply to demo emails (demo)"
+       },
+       {
+        "start": "2026-11-25T10:20:00+05:30",
+        "title": "Review demo budget (demo)"
+       }
+      ]
+     }
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-27>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.review] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-26>",
+   "status": "completed",
+   "summary": "Done today: 0 task(s); habits 0/2; 2 task(s) carry over.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 368,
+    "output_tokens": 54,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.review"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.coach.review.b": {
+  "body": {
+   "agent_id": "daily_coach_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "coach.review": {
+     "carry_over": [],
+     "date": "2026-11-24",
+     "habits_done": 0,
+     "habits_due": 0,
+     "mood_trend": {
+      "avg_energy": null,
+      "avg_mood": null,
+      "checkins": 0
+     },
+     "streaks": [],
+     "tasks_completed_today": 0,
+     "tomorrow": {
+      "first_events": [],
+      "top_tasks": []
+     }
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-53>",
+   "intent": "coaching",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:coach.review] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-52>",
+   "status": "completed",
+   "summary": "Done today: 0 task(s); habits 0/0; 0 task(s) carry over.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 236,
+    "output_tokens": 54,
+    "steps": 2
+   },
+   "warnings": [],
+   "workflow": "coach.review"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.budgets.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.budget_status": {
+     "budgets": [
+      {
+       "category": "groceries",
+       "limit": "1000.00",
+       "pct": "183.05",
+       "remaining": "-830.50",
+       "spent": "1830.50",
+       "status": "over"
+      }
+     ]
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "36210.00",
+     "expense_by_category": [
+      [
+       "rent",
+       "18000.00"
+      ],
+      [
+       "shopping",
+       "12000.00"
+      ],
+      [
+       "dining",
+       "4379.50"
+      ],
+      [
+       "groceries",
+       "1830.50"
+      ]
+     ],
+     "income": "50000.00",
+     "income_by_category": [
+      [
+       "salary",
+       "50000.00"
+      ]
+     ],
+     "net": "13790.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": "27.58",
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-9>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.budgets] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-8>",
+   "status": "completed",
+   "summary": "groceries: ₹1830.50 of ₹1000.00 (over).\nIncome ₹50000.00, spending ₹36210.00, net ₹13790.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 307,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.budgets"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.budgets.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.budget_status": {
+     "budgets": []
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "0.00",
+     "expense_by_category": [],
+     "income": "0.00",
+     "income_by_category": [],
+     "net": "0.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": null,
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-37>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.budgets] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-36>",
+   "status": "completed",
+   "summary": "No budgets are set.\nIncome ₹0.00, spending ₹0.00, net ₹0.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 247,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.budgets"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.budgets.october.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.budget_status": {
+     "budgets": [
+      {
+       "category": "groceries",
+       "limit": "1000.00",
+       "pct": "100.00",
+       "remaining": "0.00",
+       "spent": "1000.00",
+       "status": "warning"
+      }
+     ]
+    },
+    "finance.summary": {
+     "end": "2026-10-31",
+     "expense": "19000.00",
+     "expense_by_category": [
+      [
+       "rent",
+       "18000.00"
+      ],
+      [
+       "groceries",
+       "1000.00"
+      ]
+     ],
+     "income": "50000.00",
+     "income_by_category": [
+      [
+       "salary",
+       "50000.00"
+      ]
+     ],
+     "net": "31000.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": "62.00",
+     "start": "2026-10-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-11>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.budgets] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-10>",
+   "status": "completed",
+   "summary": "groceries: ₹1000.00 of ₹1000.00 (warning).\nIncome ₹50000.00, spending ₹19000.00, net ₹31000.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 298,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.budgets"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.budgets.october.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.budget_status": {
+     "budgets": []
+    },
+    "finance.summary": {
+     "end": "2026-10-31",
+     "expense": "0.00",
+     "expense_by_category": [],
+     "income": "0.00",
+     "income_by_category": [],
+     "net": "0.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": null,
+     "start": "2026-10-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-39>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.budgets] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-38>",
+   "status": "completed",
+   "summary": "No budgets are set.\nIncome ₹0.00, spending ₹0.00, net ₹0.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 250,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.budgets"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.cards.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.cards": {
+     "cards": [
+      {
+       "account_id": "<uuid-19>",
+       "band": "elevated",
+       "label": "Demo card (demo)",
+       "limit": "10000.00",
+       "owed": "3000.00",
+       "utilisation_pct": "30.00"
+      }
+     ]
+    },
+    "finance.upcoming": {
+     "upcoming": [
+      {
+       "amount": "499.00",
+       "due": "2026-11-30",
+       "kind": "subscription",
+       "label": "Demo streaming (demo)"
+      },
+      {
+       "amount": "8884.88",
+       "due": "2026-12-05",
+       "kind": "emi",
+       "label": "Demo car loan (demo)"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-18>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.cards] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-17>",
+   "status": "completed",
+   "summary": "Demo card (demo): ₹3000.00 owed, utilisation 30.00% (elevated).\nSUBSCRIPTION Demo streaming (demo): ₹499.00 due 2026-11-30.\nEMI Demo car loan (demo): ₹8884.88 due 2026-12-05.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 288,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.cards"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.cards.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.cards": {
+     "cards": []
+    },
+    "finance.upcoming": {
+     "upcoming": []
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-45>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.cards] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-44>",
+   "status": "completed",
+   "summary": "No credit cards recorded.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 204,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.cards"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.loans.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.loans": {
+     "loans": [
+      {
+       "annual_rate_pct": "12.000",
+       "emi": "8884.88",
+       "id": "<uuid-16>",
+       "installments_paid_per_schedule": 1,
+       "installments_total": 12,
+       "interest_paid_per_schedule": "1000.00",
+       "label": "Demo car loan (demo)",
+       "next_due": "2026-12-05",
+       "next_emi": "8884.88",
+       "outstanding_principal": "92115.12",
+       "principal": "100000.00",
+       "status": "active",
+       "tenor_months": 12,
+       "total_interest": "6618.53"
+      }
+     ]
+    },
+    "finance.upcoming": {
+     "upcoming": [
+      {
+       "amount": "499.00",
+       "due": "2026-11-30",
+       "kind": "subscription",
+       "label": "Demo streaming (demo)"
+      },
+      {
+       "amount": "8884.88",
+       "due": "2026-12-05",
+       "kind": "emi",
+       "label": "Demo car loan (demo)"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-15>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.loans] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-14>",
+   "status": "completed",
+   "summary": "Demo car loan (demo): outstanding ₹92115.12, EMI ₹8884.88, next due 2026-12-05.\nSUBSCRIPTION Demo streaming (demo): ₹499.00 due 2026-11-30.\nEMI Demo car loan (demo): ₹8884.88 due 2026-12-05.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 339,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.loans"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.loans.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.loans": {
+     "loans": []
+    },
+    "finance.upcoming": {
+     "upcoming": []
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-43>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.loans] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-42>",
+   "status": "completed",
+   "summary": "No loans recorded.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 199,
+    "output_tokens": 55,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.loans"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.statements.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.pending_count": {
+     "pending_review": 0
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "36210.00",
+     "expense_by_category": [
+      [
+       "rent",
+       "18000.00"
+      ],
+      [
+       "shopping",
+       "12000.00"
+      ],
+      [
+       "dining",
+       "4379.50"
+      ],
+      [
+       "groceries",
+       "1830.50"
+      ]
+     ],
+     "income": "50000.00",
+     "income_by_category": [
+      [
+       "salary",
+       "50000.00"
+      ]
+     ],
+     "net": "13790.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": "27.58",
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-21>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.statements] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-20>",
+   "status": "completed",
+   "summary": "0 transaction(s) await your review.\nIncome ₹50000.00, spending ₹36210.00, net ₹13790.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 282,
+    "output_tokens": 56,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.statements"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.statements.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.pending_count": {
+     "pending_review": 0
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "0.00",
+     "expense_by_category": [],
+     "income": "0.00",
+     "income_by_category": [],
+     "net": "0.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": null,
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-47>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.statements] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-46>",
+   "status": "completed",
+   "summary": "0 transaction(s) await your review.\nIncome ₹0.00, spending ₹0.00, net ₹0.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 251,
+    "output_tokens": 56,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.statements"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.subscriptions.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.83,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.subscriptions": {
+     "active": [
+      {
+       "amount": "499.00",
+       "label": "Demo streaming (demo)",
+       "next_due": "2026-11-30",
+       "period": "monthly"
+      }
+     ],
+     "suggested": []
+    },
+    "finance.upcoming": {
+     "upcoming": [
+      {
+       "amount": "499.00",
+       "due": "2026-11-30",
+       "kind": "subscription",
+       "label": "Demo streaming (demo)"
+      },
+      {
+       "amount": "8884.88",
+       "due": "2026-12-05",
+       "kind": "emi",
+       "label": "Demo car loan (demo)"
+      }
+     ]
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-23>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.subscriptions] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-22>",
+   "status": "completed",
+   "summary": "Demo streaming (demo): ₹499.00 monthly, next 2026-11-30.\nSUBSCRIPTION Demo streaming (demo): ₹499.00 due 2026-11-30.\nEMI Demo car loan (demo): ₹8884.88 due 2026-12-05.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 279,
+    "output_tokens": 57,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.subscriptions"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.subscriptions.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.83,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.subscriptions": {
+     "active": [],
+     "suggested": []
+    },
+    "finance.upcoming": {
+     "upcoming": []
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-49>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.subscriptions] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-48>",
+   "status": "completed",
+   "summary": null,
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 211,
+    "output_tokens": 57,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.subscriptions"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.transactions.a": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.cashflow": {
+     "closing": "13790.00",
+     "projected_month_expense": "45262.50",
+     "projection_note": "average daily expense so far x days in month; ignores scheduled bills",
+     "series": [
+      {
+       "balance": "50000.00",
+       "date": "2026-11-01",
+       "net": "50000.00"
+      },
+      {
+       "balance": "50000.00",
+       "date": "2026-11-02",
+       "net": "0.00"
+      },
+      {
+       "balance": "32000.00",
+       "date": "2026-11-03",
+       "net": "-18000.00"
+      },
+      {
+       "balance": "32000.00",
+       "date": "2026-11-04",
+       "net": "0.00"
+      },
+      {
+       "balance": "30799.50",
+       "date": "2026-11-05",
+       "net": "-1200.50"
+      },
+      {
+       "balance": "30000.00",
+       "date": "2026-11-06",
+       "net": "-799.50"
+      },
+      {
+       "balance": "29700.00",
+       "date": "2026-11-07",
+       "net": "-300.00"
+      },
+      {
+       "balance": "29380.00",
+       "date": "2026-11-08",
+       "net": "-320.00"
+      },
+      {
+       "balance": "29100.00",
+       "date": "2026-11-09",
+       "net": "-280.00"
+      },
+      {
+       "balance": "28790.00",
+       "date": "2026-11-10",
+       "net": "-310.00"
+      },
+      {
+       "balance": "28790.00",
+       "date": "2026-11-11",
+       "net": "0.00"
+      },
+      {
+       "balance": "16790.00",
+       "date": "2026-11-12",
+       "net": "-12000.00"
+      },
+      {
+       "balance": "16790.00",
+       "date": "2026-11-13",
+       "net": "0.00"
+      },
+      {
+       "balance": "16790.00",
+       "date": "2026-11-14",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-15",
+       "net": "-3000.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-16",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-17",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-18",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-19",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-20",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-21",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-22",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-23",
+       "net": "0.00"
+      },
+      {
+       "balance": "13790.00",
+       "date": "2026-11-24",
+       "net": "0.00"
+      }
+     ]
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "36210.00",
+     "expense_by_category": [
+      [
+       "rent",
+       "18000.00"
+      ],
+      [
+       "shopping",
+       "12000.00"
+      ],
+      [
+       "dining",
+       "4379.50"
+      ],
+      [
+       "groceries",
+       "1830.50"
+      ]
+     ],
+     "income": "50000.00",
+     "income_by_category": [
+      [
+       "salary",
+       "50000.00"
+      ]
+     ],
+     "net": "13790.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": "27.58",
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-13>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.transactions] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-12>",
+   "status": "completed",
+   "summary": "Income ₹50000.00, spending ₹36210.00, net ₹13790.00.\nClosing balance change this month: ₹13790.00. Projected month spending (pace estimate): ₹45262.50.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 664,
+    "output_tokens": 56,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.transactions"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.finance.transactions.b": {
+  "body": {
+   "agent_id": "finance_agent",
+   "clarification_question": null,
+   "confidence": 0.75,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "finance.cashflow": {
+     "closing": "0.00",
+     "projected_month_expense": "0.00",
+     "projection_note": "average daily expense so far x days in month; ignores scheduled bills",
+     "series": [
+      {
+       "balance": "0.00",
+       "date": "2026-11-01",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-02",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-03",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-04",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-05",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-06",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-07",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-08",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-09",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-10",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-11",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-12",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-13",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-14",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-15",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-16",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-17",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-18",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-19",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-20",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-21",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-22",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-23",
+       "net": "0.00"
+      },
+      {
+       "balance": "0.00",
+       "date": "2026-11-24",
+       "net": "0.00"
+      }
+     ]
+    },
+    "finance.summary": {
+     "end": "2026-11-30",
+     "expense": "0.00",
+     "expense_by_category": [],
+     "income": "0.00",
+     "income_by_category": [],
+     "net": "0.00",
+     "pending_review_count": 0,
+     "savings_rate_pct": null,
+     "start": "2026-11-01"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-41>",
+   "intent": "finance",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:finance.transactions] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-40>",
+   "status": "completed",
+   "summary": "Income ₹0.00, spending ₹0.00, net ₹0.00.\nClosing balance change this month: ₹0.00. Projected month spending (pace estimate): ₹0.00.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 597,
+    "output_tokens": 56,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "finance.transactions"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.general.a": {
+  "body": {
+   "agent_id": "general_agent",
+   "clarification_question": null,
+   "confidence": 0.5,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": null,
+   "error": null,
+   "execution_id": "<uuid-73>",
+   "intent": "general",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:general.assistant.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-72>",
+   "status": "completed",
+   "summary": null,
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 131,
+    "output_tokens": 57,
+    "steps": 1
+   },
+   "warnings": [],
+   "workflow": "general.assistant.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.messaging.no_conversation.b": {
+  "body": {
+   "agent_id": "messaging_agent",
+   "clarification_question": null,
+   "confidence": 0.91,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "messaging.analyse": {
+     "error": "no_shared_conversation"
+    },
+    "messaging.reply_suggestions": {
+     "error": "no_shared_conversation"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-69>",
+   "intent": "messaging",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:messaging.reply_assist.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-68>",
+   "status": "completed",
+   "summary": "messaging.reply_suggestions: unavailable (no_shared_conversation).\nmessaging.analyse: unavailable (no_shared_conversation).",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 219,
+    "output_tokens": 58,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "messaging.reply_assist.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.messaging.not_found.b": {
+  "body": {
+   "agent_id": "messaging_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "messaging.analyse": {
+     "error": "not_found"
+    },
+    "messaging.reply_suggestions": {
+     "error": "not_found"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-71>",
+   "intent": "messaging",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:messaging.reply_assist.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-70>",
+   "status": "completed",
+   "summary": "messaging.reply_suggestions: unavailable (not_found).\nmessaging.analyse: unavailable (not_found).",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 207,
+    "output_tokens": 58,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "messaging.reply_assist.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.messaging.not_shared.a": {
+  "body": {
+   "agent_id": "messaging_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "messaging.analyse": {
+     "error": "not_shared"
+    },
+    "messaging.reply_suggestions": {
+     "error": "not_shared"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-67>",
+   "intent": "messaging",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:messaging.reply_assist.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-66>",
+   "status": "completed",
+   "summary": "messaging.reply_suggestions: unavailable (not_shared).\nmessaging.analyse: unavailable (not_shared).",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 207,
+    "output_tokens": 58,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "messaging.reply_assist.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.messaging.reply_assist.a": {
+  "body": {
+   "agent_id": "messaging_agent",
+   "clarification_question": null,
+   "confidence": 0.8,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "messaging.analyse": {
+     "conversation_id": "<uuid-62>",
+     "first_message_at": "2026-11-22T09:00:00+00:00",
+     "from_me": 1,
+     "from_them": 2,
+     "instruction_like_messages": 0,
+     "last_message_at": "2026-11-23T08:00:00+00:00",
+     "last_message_intent": "thanks",
+     "last_sender": "them",
+     "median_my_response_minutes": 10.0,
+     "median_their_response_minutes": 1370.0,
+     "message_count": 3,
+     "my_style": {
+      "avg_words": 4,
+      "uses_emoji": false
+     },
+     "needs_reply": true,
+     "platform": "whatsapp",
+     "their_tone": {
+      "brief": false,
+      "formal": false,
+      "sentiment": "positive",
+      "urgent": false,
+      "uses_emoji": false
+     },
+     "topics": [
+      "hey",
+      "free",
+      "tomorrow",
+      "evening",
+      "dinner"
+     ],
+     "waiting_hours": 22.5
+    },
+    "messaging.reply_suggestions": {
+     "caution": null,
+     "conversation_id": "<uuid-62>",
+     "draft_only": true,
+     "drafts": [
+      {
+       "option": "reply",
+       "text": "You are most welcome.",
+       "tone": "formal"
+      }
+     ],
+     "intent": "thanks",
+     "needs_reply": true,
+     "note": "These are drafts for you to edit and send yourself. Nothing is sent for you.",
+     "send_supported": false,
+     "tone": "formal"
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-61>",
+   "intent": "messaging",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:messaging.reply_assist.mock] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-60>",
+   "status": "completed",
+   "summary": "Draft options (nothing is sent - edit and send them yourself):\n  1. You are most welcome.\n3 messages; reply needed: yes; last message intent: thanks.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 436,
+    "output_tokens": 58,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "messaging.reply_assist.mock"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.messaging.summary.a": {
+  "body": {
+   "agent_id": "messaging_agent",
+   "clarification_question": null,
+   "confidence": 0.86,
+   "context": {
+    "basis": "lexical-test",
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": {
+    "messaging.analyse": {
+     "conversation_id": "<uuid-62>",
+     "first_message_at": "2026-11-22T09:00:00+00:00",
+     "from_me": 1,
+     "from_them": 2,
+     "instruction_like_messages": 0,
+     "last_message_at": "2026-11-23T08:00:00+00:00",
+     "last_message_intent": "thanks",
+     "last_sender": "them",
+     "median_my_response_minutes": 10.0,
+     "median_their_response_minutes": 1370.0,
+     "message_count": 3,
+     "my_style": {
+      "avg_words": 4,
+      "uses_emoji": false
+     },
+     "needs_reply": true,
+     "platform": "whatsapp",
+     "their_tone": {
+      "brief": false,
+      "formal": false,
+      "sentiment": "positive",
+      "urgent": false,
+      "uses_emoji": false
+     },
+     "topics": [
+      "hey",
+      "free",
+      "tomorrow",
+      "evening",
+      "dinner"
+     ],
+     "waiting_hours": 22.5
+    },
+    "messaging.summary": {
+     "summary": "3 messages (1 yours, 2 theirs); recent topics: hey, free, tomorrow, evening, dinner; last message intent: thanks."
+    }
+   },
+   "error": null,
+   "execution_id": "<uuid-64>",
+   "intent": "messaging",
+   "memory_proposals": [
+    {
+     "id": "<uuid-65>",
+     "needs_confirmation": true,
+     "status": "proposed"
+    }
+   ],
+   "mock": true,
+   "replayed": false,
+   "reply": "[mock:messaging.conversation_summary] This is a placeholder response from the foundation workflow. No domain logic is implemented yet.",
+   "reply_expired": false,
+   "run_id": "<uuid-63>",
+   "status": "completed",
+   "summary": "3 messages; reply needed: yes; last message intent: thanks.\n3 messages (1 yours, 2 theirs); recent topics: hey, free, tomorrow, evening, dinner; last message intent: thanks.",
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 1,
+    "cost_inr": "0",
+    "input_tokens": 435,
+    "output_tokens": 59,
+    "steps": 3
+   },
+   "warnings": [],
+   "workflow": "messaging.conversation_summary"
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ },
+ "run.unsupported.a": {
+  "body": {
+   "agent_id": "general_agent",
+   "clarification_question": null,
+   "confidence": 0.9,
+   "context": {
+    "basis": null,
+    "items": 0,
+    "note": null,
+    "rules": 0
+   },
+   "data": null,
+   "error": null,
+   "execution_id": "<uuid-75>",
+   "intent": "unsupported",
+   "memory_proposals": [],
+   "mock": true,
+   "replayed": false,
+   "reply": "I can't make payments or transfers, or send messages for you. I can help you review, plan or draft something that you then do yourself.",
+   "reply_expired": false,
+   "run_id": "<uuid-74>",
+   "status": "unsupported",
+   "summary": null,
+   "trace_id": "<random>",
+   "usage": {
+    "attempts": 0,
+    "cost_inr": "0",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "steps": 0
+   },
+   "warnings": [],
+   "workflow": null
+  },
+  "headers": {
+   "content-type": "application/json"
+  },
+  "status": 200
+ }
+}
