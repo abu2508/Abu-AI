@@ -24,6 +24,7 @@
     "check:sdk": "node scripts/check-sdk-alignment.mjs",
     "test:coverage": "jest --coverage",
     "test:contract": "node --env-file=.contract.env node_modules/jest/bin/jest.js --config jest.contract.config.js",
+    "contract:run": "bash scripts/contract-backend.sh run",
     "contract:up": "bash scripts/contract-backend.sh up",
     "contract:down": "bash scripts/contract-backend.sh down",
     "check:transport": "node scripts/check-transport.mjs"

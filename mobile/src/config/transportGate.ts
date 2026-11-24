@@ -10,6 +10,10 @@ import { Platform } from 'react-native';
 export const NATIVE_AUTH_TRANSPORT_VERIFIED = false as boolean;
 
 export const NATIVE_GATE_TITLE = 'Native authenticated transport';
+// Branch-coverage note (M8.2 follow-up): the 'VERIFIED' arm is unreachable while the constant above is the committed
+// literal `false`. It is deliberately NOT exercised by mocking or rewriting the constant: a test that makes the gate
+// look open would be exactly the "Jest is not evidence" shortcut this gate forbids. It becomes reachable (and gets a
+// test) only in the reviewed commit that flips the constant after physical-device evidence and explicit approval.
 export const NATIVE_GATE_STATUS = (): 'BLOCKED' | 'VERIFIED' =>
   NATIVE_AUTH_TRANSPORT_VERIFIED ? 'VERIFIED' : 'BLOCKED';
 

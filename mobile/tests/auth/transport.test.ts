@@ -13,10 +13,11 @@ import type { AddressInfo } from 'node:net';
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { z } from 'zod';
+import { Platform } from 'react-native';
 
 import { createHttp, type Transport } from '@/api/http';
 import { createAuthRuntime } from '@/auth/runtime';
-import { NATIVE_AUTH_TRANSPORT_VERIFIED, credentialsAllowed } from '@/config/transportGate';
+import { NATIVE_AUTH_TRANSPORT_VERIFIED, NATIVE_GATE_STATUS, credentialsAllowed } from '@/config/transportGate';
 import { nodeFetch } from '../support/nodeFetch';
 import { ORIGIN } from '../support/fakeBackend';
 import { authStatusStore } from '@/auth/statusStore';
@@ -29,6 +30,19 @@ describe('native credential gate', () => {
     expect(credentialsAllowed('android')).toBe(false);
     expect(credentialsAllowed('web')).toBe(true);
     expect(credentialsAllowed('ios', true)).toBe(true); // only an explicit, reviewed flip would do this
+  });
+
+  it('defaults to the current platform (jest runs as iOS) and reports BLOCKED', () => {
+    expect(Platform.OS).toBe('ios');
+    expect(credentialsAllowed()).toBe(false);
+    expect(credentialsAllowed('ios')).toBe(false); // verified argument defaults to the committed constant
+    expect(NATIVE_GATE_STATUS()).toBe('BLOCKED');
+    const spy = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      expect(credentialsAllowed()).toBe(true); // web is never gated
+    } finally {
+      spy.restore();
+    }
   });
 
   it('blocks ENROLLMENT on native: nothing reaches the network', async () => {

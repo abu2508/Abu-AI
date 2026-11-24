@@ -68,6 +68,31 @@ describe('ResultCard footnotes and variants', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Hide details' }));
     expect(screen.queryByText(/Trace trace-abc/)).toBeNull();
   });
+  it('pluralises memory proposals, defaults missing usage figures, and omits absent trace/intent in details', async () => {
+    const prop = (n: number) => ({
+      id: `00000000-0000-4000-8000-00000000010${n}`,
+      status: 'proposed',
+      needs_confirmation: true,
+    });
+    await renderThemed(
+      <ResultCard
+        response={{
+          run_id: '00000000-0000-4000-8000-000000000003',
+          status: 'completed',
+          summary: 'ok',
+          data: null,
+          memory_proposals: [prop(1), prop(2)],
+          usage: {},
+        }}
+      />,
+    );
+    expect(screen.getByText(/Abu suggested 2 things to remember/)).toBeTruthy();
+    expect(screen.getByText(/0 steps · cost ₹0/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Details' }));
+    expect(screen.getByText(/Run 00000000-0000-4000-8000-000000000003/)).toBeTruthy();
+    expect(screen.queryByText(/Trace /)).toBeNull();
+    expect(screen.queryByText(/Intent /)).toBeNull();
+  });
   it('failed, unsupported and clarification variants have safe defaults', async () => {
     await renderThemed(<ResultCard response={{ ...base, status: 'failed' }} />);
     expect(screen.getByText('No valid answer')).toBeTruthy();
