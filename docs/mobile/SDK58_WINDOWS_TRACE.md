@@ -52,9 +52,12 @@ Why: the supply-chain review (plan section 11.3) found that `2g` is loaded by ev
    cd "$HOME\Abu-AI\mobile"
    $env:TRACE_OUT = "$HOME\abu-expo-trace.log"
    Remove-Item $env:TRACE_OUT -ErrorAction SilentlyContinue
-   $env:NODE_OPTIONS = "--require `"$trace`""
+   $traceFwd = $trace -replace '\\', '/'
+   $env:NODE_OPTIONS = "--require `"$traceFwd`""
+   $env:NODE_OPTIONS
    npx expo start --lan
    ```
+   **Use forward slashes in `NODE_OPTIONS`.** Node reads a backslash inside the quotes as an escape character, so `C:\Users\Abdullah B\abu-expo-trace.js` becomes `C:UsersAbdullah Babu-expo-trace.js` and Node fails with `Cannot find module` before Expo even starts (this happened on the first attempt; nothing is traced and nothing is harmed). The line `$env:NODE_OPTIONS` prints the value: it must read `--require "C:/Users/Abdullah B/abu-expo-trace.js"`. If Node ever fails to start, run `Remove-Item Env:NODE_OPTIONS` first.
    Open the app once on the iPhone (so Metro bundles), then stop Expo with `Ctrl+C`. Then clear the variable: `Remove-Item Env:NODE_OPTIONS`.
 4. While Expo is running (a second PowerShell window), look at what `2g` created (read-only):
    ```powershell
