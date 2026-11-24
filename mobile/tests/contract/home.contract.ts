@@ -31,6 +31,7 @@ import { createAuthRuntime, type AuthRuntime } from '@/auth/runtime';
 import { createAuthStatusStore } from '@/auth/statusStore';
 import { createTokenVault } from '@/auth/tokenVault';
 import { MemoryBackend } from '../support/fakeBackend';
+import openapi from '../../openapi/openapi.json';
 import { golden } from '../support/golden';
 import { nodeFetch } from '../support/nodeFetch';
 
@@ -75,6 +76,30 @@ function paths(v: unknown, prefix = ''): Set<string> {
 const unknownFields = (real: unknown, goldenValue: unknown) =>
   [...paths(real)].filter((p) => !paths(goldenValue).has(p));
 
+/**
+ * The nested shape of a plan.unscheduled[] item comes from the backend's own OpenAPI contract (UnscheduledOut, committed
+ * snapshot, additionalProperties false). The B3 golden was recorded with EVERY unscheduled[] empty, so its nested fields were
+ * never covered; the live run now always has one (the seeded 480-minute task), and unknownFields() above stays untouched and
+ * strict: each EMPTY unscheduled[] in a golden value is given one representative item built from the contract's property names,
+ * so any field the backend adds without updating the contract still fails as unknown.
+ */
+type OpenApiSchema = { properties: Record<string, unknown>; required?: string[]; additionalProperties?: boolean };
+const UNSCHEDULED = (openapi as unknown as { components: { schemas: Record<string, OpenApiSchema> } }).components
+  .schemas.UnscheduledOut!;
+const UNSCHEDULED_FIELDS = Object.keys(UNSCHEDULED.properties).sort();
+const UNSCHEDULED_SAMPLE = Object.fromEntries(UNSCHEDULED_FIELDS.map((k) => [k, 'sample']));
+function withUnscheduledSample(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(withUnscheduledSample);
+  if (v && typeof v === 'object')
+    return Object.fromEntries(
+      Object.entries(v).map(([k, x]) => [
+        k,
+        k === 'unscheduled' && Array.isArray(x) && x.length === 0 ? [UNSCHEDULED_SAMPLE] : withUnscheduledSample(x),
+      ]),
+    );
+  return v;
+}
+
 const get = <T>(
   d: ReturnType<typeof device>,
   path: string,
@@ -118,6 +143,34 @@ const MESSAGES = [
   'Plan my day',
 ];
 
+/** Runs without a backend: proves the strict comparison, and the nested unscheduled[] reference, really detect drift. */
+describe('contract helpers: unknown-field detection stays strict (no backend needed)', () => {
+  const goldenPlan = { plan: { blocks: [], unscheduled: [] as unknown[] } };
+  const item = Object.fromEntries(UNSCHEDULED_FIELDS.map((k) => [k, 'x']));
+
+  it('accepts a live unscheduled item with exactly the contract fields', () => {
+    expect(unknownFields({ plan: { blocks: [], unscheduled: [item] } }, withUnscheduledSample(goldenPlan))).toEqual([]);
+  });
+  it('FAILS on a field the contract does not define, nested inside unscheduled[]', () => {
+    const drifted = { plan: { blocks: [], unscheduled: [{ ...item, surprise: 1 }] } };
+    expect(unknownFields(drifted, withUnscheduledSample(goldenPlan))).toEqual(['plan.unscheduled[].surprise']);
+  });
+  it('still FAILS on an unknown top-level field, and the un-augmented golden still reports the nested fields (strictness unchanged)', () => {
+    expect(unknownFields({ extra: 1 }, withUnscheduledSample(goldenPlan))).toEqual(['extra']);
+    expect(unknownFields({ plan: { unscheduled: [item] } }, goldenPlan).sort()).toEqual(
+      UNSCHEDULED_FIELDS.map((k) => `plan.unscheduled[].${k}`).sort(),
+    );
+  });
+  it('only augments EMPTY unscheduled arrays: a non-empty golden array is left exactly as recorded', () => {
+    const recorded = { plan: { unscheduled: [{ task_id: 'a' }] } };
+    expect(withUnscheduledSample(recorded)).toEqual(recorded);
+  });
+  it('derives the nested fields from the OpenAPI contract: four required fields, no extras allowed', () => {
+    expect(UNSCHEDULED_FIELDS).toEqual(['reason', 'score', 'task_id', 'title']);
+    expect(UNSCHEDULED.additionalProperties).toBe(false);
+  });
+});
+
 suite('contract: Home reads and the orchestrator vs the real synthetic backend', () => {
   it('the Home reads validate with zod and contain no field beyond the B3 golden shapes', async () => {
     const d = device();
@@ -130,13 +183,28 @@ suite('contract: Home reads and the orchestrator vs the real synthetic backend',
     const briefing = await get(d, '/v1/coach/briefing', coachBriefingSchema);
     const inbox = await get(d, '/v1/messaging/inbox', inboxSchema);
     expect(unknownFields(summary, golden['route.a.finance.summary']!.body)).toEqual([]);
-    expect(unknownFields(briefing, golden['route.a.coach.briefing']!.body)).toEqual([]);
+    expect(unknownFields(briefing, withUnscheduledSample(golden['route.a.coach.briefing']!.body))).toEqual([]);
     expect(unknownFields(insights, golden['route.a.finance.insights']!.body)).toEqual([]);
     expect(unknownFields(upcoming, golden['route.a.finance.upcoming']!.body)).toEqual([]);
     expect(summary.pending_review_count).toBe(0);
     expect(insights.length).toBeGreaterThan(0);
     expect(upcoming.map((u) => u.kind).sort()).toEqual(['emi', 'subscription']);
     expect(briefing.plan.blocks.length).toBeGreaterThan(0);
+    // Deterministic clock: the live backend's Coach clock is frozen (mobile/scripts/contract-api.py), so the plan does not
+    // depend on the time of day. A backend without the frozen clock fails here, loudly, instead of failing later by chance.
+    expect(env('ABU_CONTRACT_NOW')).toMatch(/^\d{4}-\d{2}-\d{2}T06:30:00\+00:00$/);
+    expect(briefing.date).toBe(env('ABU_CONTRACT_NOW').slice(0, 10));
+    expect(briefing.plan.blocks).toHaveLength(3);
+    expect(briefing.plan.planned_minutes).toBe(110);
+    // The nested fields of unscheduled[] are validated against the backend's OpenAPI contract on every run.
+    expect(briefing.plan.unscheduled.map((u) => [u.title, u.reason])).toEqual([
+      ['Plan a demo offsite (demo)', 'no_free_window'],
+    ]);
+    for (const u of briefing.plan.unscheduled) {
+      expect(Object.keys(u).sort()).toEqual(UNSCHEDULED_FIELDS); // all contract fields present, none extra
+      expect(UNSCHEDULED.required?.slice().sort()).toEqual(UNSCHEDULED_FIELDS); // the contract requires every field
+      expect(UNSCHEDULED.additionalProperties).toBe(false);
+    }
     expect(inbox.map((i) => [i.title, i.shared_with_assistant])).toEqual(
       expect.arrayContaining([
         ['Asha (demo)', true],
@@ -190,7 +258,7 @@ suite('contract: Home reads and the orchestrator vs the real synthetic backend',
         const g = Object.values(golden)
           .map((x) => (x.body as { data?: Record<string, unknown> } | null)?.data?.[key])
           .find((x) => x !== undefined && !(x as { error?: unknown }).error);
-        if (g) expect({ key, extra: unknownFields(raw, g) }).toEqual({ key, extra: [] });
+        if (g) expect({ key, extra: unknownFields(raw, withUnscheduledSample(g)) }).toEqual({ key, extra: [] });
       }
     expect([...seen].sort()).toEqual([...TOOL_KEYS].sort());
     await d.rt.logout();

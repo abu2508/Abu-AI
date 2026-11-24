@@ -22,8 +22,11 @@ const call = async (method, path, token, body) => {
   return text ? JSON.parse(text) : null;
 };
 
+// The backend's Coach clock is frozen for the contract run (mobile/scripts/contract-api.py): ABU_CONTRACT_DATE is the frozen UTC
+// date and ABU_CONTRACT_NOW the frozen instant, both set once by contract-backend.sh. Without them the real clock is used.
+const frozenNow = process.env.ABU_CONTRACT_NOW ? new Date(process.env.ABU_CONTRACT_NOW) : null;
 const day = (offset) => {
-  const d = new Date();
+  const d = process.env.ABU_CONTRACT_DATE ? new Date(`${process.env.ABU_CONTRACT_DATE}T00:00:00Z`) : new Date();
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().slice(0, 10);
 };
@@ -101,6 +104,9 @@ await post('/v1/coach/tasks', {
   goal_id: goal.id,
 });
 await post('/v1/coach/tasks', { title: 'Review demo budget (demo)', priority: 2, estimate_minutes: 30 });
+// A task longer than any free window of the day (the longest estimate the API allows is 480 minutes; the frozen window is
+// 12:00-18:00): it is ALWAYS reported in plan.unscheduled, so the nested fields of unscheduled[] are exercised on every run.
+await post('/v1/coach/tasks', { title: 'Plan a demo offsite (demo)', priority: 3, estimate_minutes: 480 });
 await post('/v1/coach/tasks', {
   title: 'Reply to demo emails (demo)',
   priority: 3,
@@ -117,7 +123,7 @@ await post('/v1/coach/events', {
   end: `${day(0)}T23:30:00+05:30`,
   reminder_minutes: 10,
 });
-const earlier = new Date(Date.now() - 3600_000).toISOString();
+const earlier = new Date((frozenNow ? frozenNow.getTime() : Date.now()) - 3600_000).toISOString(); // due relative to the Coach clock
 await post('/v1/coach/reminders', { text: 'Demo reminder (demo)', remind_at: earlier });
 await post('/v1/coach/checkins', { kind: 'morning', mood: 4, energy: 3 });
 
