@@ -16,7 +16,10 @@ import {
 import { GATES } from '@/config/gates';
 import { NATIVE_GATE_STATUS, NATIVE_GATE_TITLE } from '@/config/transportGate';
 import type { AppearancePreference } from '@/prefs/appearance';
+import { CanaryScreen } from './CanaryScreen';
 import { ConnectionScreen, SessionsScreen } from './ConnectionScreens';
+
+declare const __DEV__: boolean;
 
 export const SETTINGS_SECTIONS = [
   { slug: 'appearance', title: 'Appearance', subtitle: 'System, Light or Dark', ready: true },
@@ -29,7 +32,11 @@ export const SETTINGS_SECTIONS = [
   { slug: 'activity', title: 'Activity', subtitle: 'Runs and audit trail', ready: false },
   { slug: 'data', title: 'Data and privacy', subtitle: 'Erase everything', ready: false },
   { slug: 'about', title: 'About', subtitle: 'Version and security gates', ready: true },
+  { slug: 'canary', title: 'Transport canary (debug)', subtitle: 'Redirect check with fake credentials', ready: true },
 ] as const;
+
+/** The canary is a debug-build tool only. */
+const visible = (slug: string) => slug !== 'canary' || (typeof __DEV__ !== 'undefined' && __DEV__);
 
 export function SettingsIndex() {
   const router = useRouter();
@@ -37,7 +44,7 @@ export function SettingsIndex() {
     <Screen>
       <SyntheticChip />
       <Card>
-        {SETTINGS_SECTIONS.map((s) => (
+        {SETTINGS_SECTIONS.filter((s) => visible(s.slug)).map((s) => (
           <ListRow
             key={s.slug}
             title={s.title}
@@ -138,6 +145,7 @@ export function SettingsSectionScreen() {
   if (section === 'about') return <AboutScreen />;
   if (section === 'connection') return <ConnectionScreen />;
   if (section === 'sessions') return <SessionsScreen />;
+  if (section === 'canary') return <CanaryScreen />;
   return (
     <Screen>
       <EmptyState

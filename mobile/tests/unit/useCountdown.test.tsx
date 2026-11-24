@@ -3,7 +3,9 @@ import { act, renderHook } from '@testing-library/react-native';
 
 import { useCountdown } from '@/lib/useCountdown';
 
-afterEach(() => jest.useRealTimers());
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 describe('useCountdown', () => {
   it('is idle without a value, counts down to 0 and stops', async () => {
