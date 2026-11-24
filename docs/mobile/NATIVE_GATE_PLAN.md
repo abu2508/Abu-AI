@@ -1,7 +1,7 @@
-# Plan (revision 2): record verified redirect behaviour per configuration, without authorising native authenticated requests
+# Plan (revision 3): record verified redirect behaviour per configuration, without authorising native authenticated requests
 
-Status: **PLAN ONLY (revision 2). Commit 1 is done; commits 2-4 are NOT approved. Waiting for your review of this revision.**
-Branch `claude/charming-davinci-vqv0du`. Revision 1 was commit `c3cbd2232797398a96aef87f31c4c6d995ae760d`.
+Status: **Revision 3 records your decisions E1-E4 and clarifications. Commit 1 is done and accepted. Commits 2 and 3 are approved but MUST NOT START until the iPhone canary re-run evidence has been reviewed. Commit 4 is conditionally approved (separate approval needed). Changing `NATIVE_AUTH_TRANSPORT_VERIFIED` is NOT approved.**
+Branch `claude/charming-davinci-vqv0du`. Revision 1 was commit `c3cbd2232797398a96aef87f31c4c6d995ae760d`, revision 2 `f6e4c66eaaa40229b2f85bf9e93d401e3487d8c0`.
 Standing constraints are unchanged: synthetic data and the mock model only; the four production security gates remain **BLOCKED**; no real credential, production connectivity or personal data; no backend, API, migration or dependency change; no M8.3, no B3b.
 
 ## 0. What changed in this revision, and why
@@ -21,7 +21,17 @@ Your correction: the iPhone canary shows that `expo/fetch` did not forward reque
 | D5 | CI **warning** after 180 days, not a failure |
 | D6 | Staged commits; the final commit needs a separate approval |
 | Correction | Redirect verification must not automatically authorise native authenticated requests; `NATIVE_AUTH_TRANSPORT_VERIFIED` stays `false` until the remaining requirements have evidence and approval |
-Approval boundary now: **commit 1 and the canary re-run only.** Commits 2, 3 and 4 below wait for your approval of this revision.
+**Approval boundary (your review of revision 2):**
+| Item | Decision |
+|---|---|
+| Commit 1 (runtime facts in the canary evidence) | **Accepted** (`e4f6331`, GitHub Actions run 45454501357 passed) |
+| E1: two independent mechanisms (redirect registry, boolean authorisation) | **Approved** |
+| E2: requirements | **Approved with additions:** R1-R7 plus R8-R11 (section 6) |
+| E3: About wording | **Approved with revised wording** (section 5.6); the Connection screen must reflect the same distinction |
+| E4: commit 4 separately reviewed; boolean excluded | **Approved** |
+| Commit 2 (evaluator, empty registry) and commit 3 (guard, checklist R1-R11) | **Approved, but not to be started until the new iPhone canary evidence (React Native runtime, execution environment, Expo Go version) has been reviewed**, because that evidence is the input to the registry design |
+| Commit 4 (one registry entry) | **Conditional:** prepare only after commits 2 and 3 are implemented and reviewed and the new evidence is reviewed; needs your separate approval before the entry is added |
+| Changing `NATIVE_AUTH_TRANSPORT_VERIFIED` | **Not approved;** needs a separate plan and explicit approval |
 
 ## 2. Goal and non-goals
 **Goal.** Record, per exact native configuration, that the redirect canary passed, and make that record machine-checkable, version-pinned and self-invalidating on upgrades. Today's evidence supports one configuration: **iOS, in Expo Go, Expo SDK 58.0.0, one React Native runtime**.
@@ -87,11 +97,14 @@ The production constant is `false`, so only the first row can occur in a real bu
 ### 5.5 Automatic invalidation of the registry on upgrades
 At build time `check:native-gate` compares every entry with the installed `expo` and `react-native` package versions (exact, D3) and the SDK major, and fails the build with "redirect verification stale: re-run the canary and update the entry". At run time an Expo Go update that changes the SDK or runtime stops matching. A **warning** (not a failure, D5) is printed when an entry is older than 180 days.
 
-### 5.6 UI wording
-About keeps its existing "Native authenticated transport" row (**BLOCKED**) and gets a separate informational row "Redirect verification": for the tested configuration "Verified for iOS in Expo Go, SDK 58.0.0, React Native <runtime> (2026-11-24): redirect behaviour only", otherwise "Not verified: <reason>". Both rows state that Android, development, standalone and release builds are not covered, and that **a verified redirect behaviour does not authorise authenticated requests**. The connection and live-data screens keep showing the authentication block and its reason (`authorisation_not_granted` first). The existing About test (five BLOCKED rows) is unchanged: the new row never reads "BLOCKED".
+### 5.6 UI wording (approved with your revised text)
+Two separate rows on the About screen, never merged:
+1. **Native authenticated transport**, status **BLOCKED**, text: "Authenticated requests are disabled. Redirect verification alone does not authorise access."
+2. **Redirect verification**, status **Verified** only when an exact configuration matches an entry, text: "Redirect behaviour verified for iOS in Expo Go, SDK 58.0.0, React Native [runtime]. This verifies redirect handling only; it does not authorise authenticated requests." (the version values are read from the matching entry). When no entry matches the status reads **Not verified** with the reason (my wording for this case, not yet reviewed by you: "Redirect behaviour is not verified for this build: <reason>. Authenticated requests are disabled.").
+The **Connection screen** shows the same two statements: the authentication block with its reason (`authorisation_not_granted` first), and, where relevant, the redirect-verification state with the sentence that it does not authorise authenticated requests. The existing About test (five BLOCKED rows) is unchanged because row 2 never reads "BLOCKED".
 
 ## 6. What must be true before the boolean can ever change (evidence, outside this plan)
-A separate document, `docs/mobile/NATIVE_AUTH_AUTHORISATION.md`, created in commit 3, lists these requirements with a status and an evidence link; **all are NOT MET today**. Changing the boolean needs every item MET and your explicit approval of a separate plan.
+A separate document, `docs/mobile/NATIVE_AUTH_AUTHORISATION.md`, created in commit 3, lists these requirements (R1-R11) with a status and an evidence link; **all are NOT MET today**, and each stays NOT MET until independently evidenced and approved. Changing the boolean needs every item MET and your explicit approval of a separate plan.
 | # | Requirement | Evidence needed | Status |
 |---|---|---|---|
 | R1 | **HTTPS with the actual approved backend**: certificate validation, App Transport Security, no cleartext exceptions, behaviour on certificate failure | a device run against an approved HTTPS endpoint (the real phone-to-backend testing that Option B deferred) | NOT MET |
@@ -101,10 +114,14 @@ A separate document, `docs/mobile/NATIVE_AUTH_AUTHORISATION.md`, created in comm
 | R5 | **Failure scenarios on a device**: offline, timeouts, 401/403/429/5xx, TLS failure, captive portal or proxy, redirect on GET and other methods, malformed bodies, kill switch | a written device test run with results | NOT MET |
 | R6 | **Credential handling on a device**: Keychain-only storage, no logging or screenshot exposure, erase on logout and reset, behaviour when secure storage is unavailable | device checks plus a review | NOT MET |
 | R7 | **The four production gates G1-G4 and operator approvals** for any real backend or data | separate approvals; nothing in this plan changes them | BLOCKED |
-Redirect verification (this plan) contributes to R1-R6 as one input; it satisfies none of them on its own.
+| R8 | **Redirect coverage beyond POST:** the relevant HTTP methods (at least GET, POST, PUT, PATCH and DELETE as the app uses or could use them) and redirect scenarios (301, 302, 303, 307, 308, with and without a body, to another origin, scheme or port, chains and loops, `Location` edge cases, a server that redirects only after earlier requests) | an extended canary run with results per method and scenario; today only POST with four statuses has evidence | NOT MET |
+| R9 | **Transport enforcement:** every authenticated network request goes through the approved `expo/fetch` transport; no alternate `fetch`, `XMLHttpRequest`, WebSocket, native module or library bypasses it | the existing lint and `check:transport` bans extended to every network path (including dependencies that make requests), plus a runtime check or test that fails on an unapproved network call | NOT MET |
+| R10 | **Authentication lifecycle on the actual device:** logout, token deletion (Keychain and memory), refresh failure, session revocation by the server and by another device, expiry, reset | device runs with the results, matching the M8.1 persisted-state tests | NOT MET |
+| R11 | **Build provenance:** the exact native binary, runtime and build configuration under test are identified and recorded (for Expo Go: the Expo Go version and its runtime; for any other build: its own binary, commit and configuration). **Expo Go evidence is never transferred to a standalone, development-client, TestFlight or App Store build.** | a provenance record in each evidence document, checked by the guard | NOT MET |
+Redirect verification (this plan) contributes to R1, R5 and R8 as one input; it satisfies none of R1-R11 on its own.
 
 ## 7. CI guard `check:native-gate` (no dependencies; in `check:all` and the workflow; commit 3)
-Fails when: (a) an entry has `platform` other than `ios`, `environment` other than `expo-go`, or `scope` other than `redirect-behaviour-only`; (b) fields are malformed, ids duplicated or `verifiedOn` is invalid or in the future; (c) the evidence file is missing or lacks the entry id and the pinned values; (d) the entry is stale against the installed `expo` and `react-native` versions or the SDK major; (e) the evidence document lacks PASS for all of 301, 302, 307 and 308; (f) **`NATIVE_AUTH_TRANSPORT_VERIFIED` is `true` while any requirement in `NATIVE_AUTH_AUTHORISATION.md` is not MET with an approval reference**; (g) `credentialsAllowed` does not contain the conjunction with the boolean (a static check that nobody reintroduces a registry-only path). **Negative tests** (fixtures) cover each failure plus a passing control, including "boolean true with an unmet requirement fails".
+Fails when: (a) an entry has `platform` other than `ios`, `environment` other than `expo-go`, or `scope` other than `redirect-behaviour-only`; (b) fields are malformed, ids duplicated or `verifiedOn` is invalid or in the future; (c) the evidence file is missing or lacks the entry id and the pinned values; (d) the entry is stale against the installed `expo` and `react-native` versions or the SDK major; (e) the evidence document lacks PASS for all of 301, 302, 307 and 308; (f) **`NATIVE_AUTH_TRANSPORT_VERIFIED` is `true` while any requirement R1-R11 in `NATIVE_AUTH_AUTHORISATION.md` is not MET with an approval reference**; (f2) an evidence document lacks the build-provenance record (R11) or claims evidence for an environment other than the one in the entry; (g) `credentialsAllowed` does not contain the conjunction with the boolean (a static check that nobody reintroduces a registry-only path). **Negative tests** (fixtures) cover each failure plus a passing control, including "boolean true with an unmet requirement fails".
 
 ## 8. Tests
 1. Evaluator matrix of section 5.4, at least 25 cases, including garbage and missing facts, prerelease tags, numeric and string `Platform.Version`.
@@ -120,10 +137,10 @@ Existing tests of the boolean (`transport.test.ts`, `runtime.test.ts`, `harness.
 | # | Commit | State of the gate |
 |---|---|---|
 | 1 | **DONE `e4f6331`:** canary evidence records `reactNativeRuntime`, `executionEnvironment`, `expoGoVersion` | unchanged (closed) |
-| - | **Your step (approved):** re-run the iPhone canary on the same Expo Go 58.0.5 with the new build, and send the updated evidence | unchanged |
+| - | **Your step (approved, in progress):** re-run the iPhone canary on the same Expo Go 58.0.5 with the new build and send the updated evidence. **Commits 2 and 3 do not start until you have reviewed it.** | unchanged |
 | 2 | `refactor(mobile): redirect-verification evaluator; authentication stays blocked`: runtime facts, evaluator, **empty** `redirectVerifications.json`, the two-key `credentialsAllowed`, runtime seams, UI rows, tests of section 8. **The boolean stays `false` and is mandatory.** | closed everywhere |
-| 3 | `ci(mobile): add check:native-gate and the authorisation checklist`: the guard with negative tests, `NATIVE_AUTH_AUTHORISATION.md` (all NOT MET) | closed everywhere |
-| 4 | **Needs your separate approval:** add **one registry entry** (redirect behaviour only), the evidence update and docs, and the flipped phase-invariant test. It does **not** touch the boolean and, by tests 2 and 3, cannot authorise anything. | still closed for authentication |
+| 3 | `ci(mobile): add check:native-gate and the authorisation checklist`: the guard with negative tests, `NATIVE_AUTH_AUTHORISATION.md` (R1-R11, all NOT MET) | closed everywhere |
+| 4 | **Conditional; needs your separate approval after commits 2 and 3 and the new evidence are reviewed:** add **one registry entry** (redirect behaviour only), the evidence update and docs, and the flipped phase-invariant test. It does **not** touch the boolean and, by tests 2 and 3, cannot authorise anything. | still closed for authentication |
 | later | Flipping `NATIVE_AUTH_TRANSPORT_VERIFIED` is **not part of this plan**: it needs R1-R7 evidence and a separate plan and approval. | - |
 After each commit: `check:all`, a clean-checkout `npm ci`, the real GitHub Actions run, no dependency or lockfile change; contract and E2E run after commit 2 (demo mode, unaffected).
 
@@ -134,8 +151,9 @@ After each commit: `check:all`, a clean-checkout `npm ci`, the real GitHub Actio
 4. `Constants.executionEnvironment` and `Platform.constants.reactNativeVersion` must be readable in Expo Go SDK 58; the re-run proves that before anything depends on it. If a value is unreadable, work stops and returns to you.
 5. A reader could still mistake the About "Redirect verification" row for authentication readiness; the wording in 5.6 and the separate BLOCKED row are there to prevent that, and I would like your wording review before commit 2.
 
-## 11. Decisions I need from you now
-- **E1:** approve this revision (two keys; the boolean is retained and mandatory; the registry is redirect-only) so commits 2 and 3 can proceed.
-- **E2:** confirm the R1-R7 requirement list in section 6, or edit it; it is what the future boolean change will be measured against.
-- **E3:** approve the About wording in 5.6, or give me preferred text.
-- **E4:** confirm that commit 4 (a registry entry) may be prepared only after commits 2-3 are reviewed, and that flipping the boolean is out of scope here.
+## 11. Decisions recorded (your answers to E1-E4)
+- **E1** approved (two independent mechanisms; the boolean is retained and mandatory; the registry is redirect-only).
+- **E2** approved with additions R8-R11 (section 6); all of R1-R11 stay NOT MET.
+- **E3** approved with the revised wording (section 5.6), including the Connection screen.
+- **E4** approved (commit 4 separately reviewed; the boolean is excluded).
+**Still open, for the evidence review:** the exact `reactNativeRuntime` value, the execution environment and the Expo Go version from the re-run, which become the registry entry's pins; and your review of the one sentence marked "not yet reviewed" in section 5.6.
