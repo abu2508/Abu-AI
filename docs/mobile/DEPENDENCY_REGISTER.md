@@ -3,9 +3,9 @@
 **Nothing in this register is installed.** Approve the list (or mark packages to swap); installation happens in M8.0 only.
 
 Data provenance: versions, licences, release dates and download counts were read from public npm registry metadata on 2026-11-24
-(read-only queries; nothing was downloaded into the project). The npm bulk-advisory endpoint reported **no known advisories** for any exact
-version listed (re-run in CI on every install). **Transitive** dependencies and their licences are not yet audited (that needs an install):
-M8.0 adds the licence/audit scanners and reports the first scan before any feature work.
+(read-only queries; nothing installed into the project). The **transitive audit is complete** and recorded in [DEPENDENCY_AUDIT](DEPENDENCY_AUDIT.md): 1,608 packages resolved, licences scanned,
+vulnerabilities audited (23 found transitively: 3 high fixed by an override, 20 moderate in Node-side dev tooling only), install scripts inspected including Skia's. It supersedes the
+earlier statement that no advisories existed (that covered direct packages only).
 
 ## 1. How versions are chosen
 
@@ -81,7 +81,6 @@ Recommendation: **SDK 57** for a security-sensitive app (more patches, wider fie
 | `typescript-eslint` | 8.74.0 | TypeScript lint rules | MIT | 2026-11-23; 122.8M/wk | Dev-only | - | M8.0 |
 | `eslint-config-expo` | 57.0.2 | Expo lint baseline (SDK 57 line) | MIT | 2026-08-26; 4.0M/wk | Dev-only | Hand-rolled config | M8.0 |
 | `eslint-plugin-react-hooks` | 7.1.1 | Hooks correctness | MIT | 2026-04-17; 123.7M/wk | Dev-only | - | M8.0 |
-| `eslint-plugin-react-native-a11y` | 3.5.1 | Accessibility lint rules | MIT | 2024-11-04; 438k/wk; stale | Dev-only; **last release Nov 2024 (stale)**: supplement, never rely on it alone | Own rules + RNTL role queries (we do both) | M8.0 |
 | `prettier` | 3.10.1 | Formatting | MIT | 2026-11-12; 196.8M/wk | Dev-only | Biome | M8.0 |
 | `@playwright/test` | 1.65.1 | Web-gallery visual regression and web E2E in Codespaces | Apache-2.0 | 2026-11-13; 138.8M/wk | Dev-only; downloads browsers (CI cache); pinned | Cypress; Storybook test-runner | M8.2 |
 | `openapi-typescript` | 7.13.0 | Generate API types from the committed OpenAPI snapshot (B2) | MIT | 2026-02-11; 18.0M/wk; last release Feb 2026 | Dev-only; reads a local file only | orval; hand-written types | M8.1 |
@@ -102,6 +101,20 @@ Also needed (not npm packages): **Maestro CLI** (E2E flows; Apache-2.0; only whe
 `@expo/vector-icons` (original SVG + SF Symbols instead), `expo-image` / `@expo/ui` (in the SDK template, not needed). `expo-glass-effect` (iOS 26 glass) stays an
 option for the Hybrid look, reviewed separately.
 
+## 5b. Incremental installation schedule (nothing outside the current milestone is installed)
+
+| Milestone | Installs (exact versions above) |
+|---|---|
+| M8.0 | `expo`, `react`, `react-native`, `expo-router` and the packages Router requires as peers (`react-native-screens`, `react-native-safe-area-context`, `expo-linking`, `expo-constants`, `expo-status-bar`, `react-native-web`, `react-dom`, `expo-font` if the template needs it); dev: `typescript`, `@types/react`, `jest`, `jest-expo`, `@testing-library/react-native`, `eslint` + `typescript-eslint` + `eslint-config-expo` + `eslint-plugin-react-hooks`, `prettier`, `openapi-typescript` |
+| M8.1 | `zod`, `@tanstack/react-query`, `zustand`, `expo-secure-store`, `expo-local-authentication`, (`expo-camera` only if QR scan is approved), `msw` (dev) |
+| M8.2 | `react-native-reanimated`, `react-native-worklets`, `react-native-gesture-handler`, `@shopify/react-native-skia`, `react-native-svg`, `expo-blur`, `expo-symbols`, `expo-haptics`, `expo-system-ui`, `expo-splash-screen`, `@react-native-async-storage/async-storage`, `@playwright/test` (dev) |
+| M8.3 | `expo-document-picker`, `expo-file-system`, (`expo-localization` if needed) |
+| M8.4 | `expo-clipboard` |
+| M8.5 | `expo-notifications` |
+| M8.8 (deferred) | `expo-calendar`, `expo-dev-client`, optional/alternative native packages in section 5 |
+
+Each milestone re-runs the audit/licence/install-script scan on the real lockfile before its install is committed.
+
 ## 6. Review process for any later addition
 
 1. Justify it (what problem, why existing packages cannot). 2. Record licence, maintainers/adoption, last release, install scripts, native permissions, network use.
@@ -110,10 +123,10 @@ option for the Hybrid look, reviewed separately.
 
 ## 7. Risk notes
 
-- **Skia install script:** the only runtime package with a `postinstall` that runs code. Install with scripts disabled by default and allowlist this one after reading it at M8.0;
-  fallback is an SVG-only orb (no Skia).
-- **Stale lint plugin:** `eslint-plugin-react-native-a11y` has had no release since Nov 2024; kept as a supplement only.
-- **ESLint 10 vs the Expo config:** confirm at M8.0; fall back to ESLint 9 if needed.
+- **Skia install script:** inspected (DEPENDENCY_AUDIT section 4): local file copy only, no network or exec. Install with `--ignore-scripts` by default and allowlist it (and `@parcel/watcher`, `fsevents`) explicitly; fallback is an SVG-only orb.
+- **Removed:** `eslint-plugin-react-native-a11y` (stale and its peer range stops at ESLint 8: it cannot coexist with ESLint 10). Accessibility linting = our own rules + Testing Library queries.
+- **Override:** `decode-uri-component` -> `0.5.1` to clear the high-severity advisories reached through `expo-router` -> `query-string` (verify at M8.0).
+- **ESLint 10 vs the Expo config:** the tree resolves with ESLint 10 and `eslint-config-expo@57.0.2`; confirm lint runs at M8.0, fall back to ESLint 9 if needed.
 - **MSW 3 peers:** optional peers (vite, graphql) must not be pulled in; confirm at M8.0.
 - **AsyncStorage 2.x vs upstream 3.x:** staying on the SDK-bundled line is intentional.
 - **Licences:** every direct dependency listed is MIT or Apache-2.0 (TypeScript and Playwright are Apache-2.0). Transitive licences are scanned in M8.0; anything outside the allowlist blocks CI until approved.

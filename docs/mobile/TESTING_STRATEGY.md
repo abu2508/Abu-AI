@@ -8,7 +8,7 @@ See also [PHASE_MILESTONES](PHASE_MILESTONES.md): the **test report format** del
 
 | Layer | Tooling (candidates) | What it covers | Runs in Codespaces/Linux? | Runs in CI |
 |---|---|---|---|---|
-| Static | `tsc --noEmit` (strict), ESLint (+ a11y rules), custom lint rules, dependency audit, secret scan | types, no `parseFloat` on money, no raw hex in components, no `console.log`, no `fetch` outside `src/api`, no `AsyncStorage` for secrets | yes | every PR |
+| Static | `tsc --noEmit` (strict), ESLint (+ our own a11y rules: the `react-native-a11y` plugin is dropped, see DEPENDENCY_AUDIT), custom lint rules, dependency audit, secret scan | types, no `parseFloat` on money, no raw hex in components, no `console.log`, no `fetch` outside `src/api`, no `AsyncStorage` for secrets | yes | every PR |
 | Unit | Jest (`jest-expo`) | money formatting (property tests), error parsing (both shapes), session state machine, single-flight refresh, idempotency keys, redacting logger, theme resolution, token contrast maths, deep-link allowlist | yes | every PR |
 | Component | React Native Testing Library | every design-system component in light and dark; states (loading/empty/error/kill-switch); accessibility roles/labels | yes | every PR |
 | API mocking | `msw` | screens against canned (synthetic) responses incl. error shapes | yes | every PR |
@@ -16,7 +16,7 @@ See also [PHASE_MILESTONES](PHASE_MILESTONES.md): the **test report format** del
 | Visual regression | `react-native-web` gallery + Playwright (available here) | components and key screens, Light and Dark, large text; diff against baselines | yes (web approximation) | every PR |
 | End-to-end | Maestro flows (authored here) | enroll, home, add/confirm transaction, import statement, ingest alert, reply draft copy, task/habit flow, assistant request, kill switch, appearance switch, erase | needs simulator/device | on macOS runner / device before milestones |
 | Native | JS fakes + manual device scripts | Share Extension, App Intents, EventKit, speech, notifications | fakes yes; real **device only** | manual, recorded in phase report |
-| Accessibility audit | RNTL queries, ESLint a11y, manual VoiceOver/Dynamic Type/Reduce Motion pass | see section 3 | partly | manual per phase |
+| Accessibility audit | RNTL queries, own ESLint a11y rules, manual VoiceOver/Dynamic Type/Reduce Motion pass | see section 3 | partly | manual per phase |
 | Performance | Flashlight/profiler on device, React profiler, bundle-size budget | cold start, list scroll, orb frame rate, memory | partly | per phase |
 
 ## 2. Critical test cases (must exist before the phase that introduces them ends)
@@ -61,7 +61,7 @@ accessibility sizes with no clipped critical figures; VoiceOver labels/values/hi
 sections; Reduce Motion, Reduce Transparency, Bold Text, Differentiate Without Colour; charts have text equivalents; focus
 management after sheets and errors; no timeouts that hide content without user control; external keyboard and Switch Control focus order.
 
-Checks: automated (ESLint a11y rules, RNTL role/label queries, contrast script as a CI gate); per-phase manual audit with a
+Checks: automated (own ESLint a11y rules, RNTL role/label queries, contrast script as a CI gate); per-phase manual audit with a
 written checklist (VoiceOver on device, largest Dynamic Type, Reduce Motion on, Increase Contrast on, dark and light);
 accessibility defects are phase-blocking at "serious" severity.
 
