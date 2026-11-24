@@ -45,6 +45,8 @@ jobs:
           npm run check:licenses
           npm run check:install-scripts
           npm run check:audit
+          npm run check:overrides
+          npm run check:noxcturnal
       - name: Web export and secret scan (source + bundle)
         run: |
           npm run export:web
