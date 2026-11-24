@@ -1,5 +1,7 @@
 # Plan (revision 3): record verified redirect behaviour per configuration, without authorising native authenticated requests
 
+Implementation status (2026-11-24, after review of the rerun evidence `998e29f`): **commits 2 and 3 are implemented** (registry empty, boolean `false`, guard `check:native-gate`, checklist `NATIVE_AUTH_AUTHORISATION.md`); `expoGoVersion` was renamed `expoGoBuild` and a `null` `expoGoMarketingVersion` was added, as approved. Commit 4 and any change of the boolean are NOT approved. Original status line follows.
+
 Status: **Revision 3 records your decisions E1-E4 and clarifications. Commit 1 is done and accepted. Commits 2 and 3 are approved but MUST NOT START until the iPhone canary re-run evidence has been reviewed. Commit 4 is conditionally approved (separate approval needed). Changing `NATIVE_AUTH_TRANSPORT_VERIFIED` is NOT approved.**
 Branch `claude/charming-davinci-vqv0du`. Revision 1 was commit `c3cbd2232797398a96aef87f31c4c6d995ae760d`, revision 2 `f6e4c66eaaa40229b2f85bf9e93d401e3487d8c0`.
 Standing constraints are unchanged: synthetic data and the mock model only; the four production security gates remain **BLOCKED**; no real credential, production connectivity or personal data; no backend, API, migration or dependency change; no M8.3, no B3b.
@@ -45,7 +47,7 @@ Your correction: the iPhone canary shows that `expo/fetch` did not forward reque
 **All of this stays.** The boolean, its `check:transport` rule and its tests are kept as they are; the new work is added **next to** them.
 
 ## 4. What the evidence pins
-Expo Go runs the **app JavaScript** from this repository and the **native runtime** from the Expo Go app (tested: 58.0.5, React Native runtime 0.88.0 per the DevTools header; this repository's `react-native` package is 0.88.1). Commit 1 made the canary record `reactNativeRuntime`, `executionEnvironment` and `expoGoVersion`; the re-run (section 8, step 2) supplies the exact values in the same report, so no pin comes from a screenshot.
+Expo Go runs the **app JavaScript** from this repository and the **native runtime** from the Expo Go app (tested: 58.0.5, React Native runtime 0.88.0 per the DevTools header; this repository's `react-native` package is 0.88.1). Commit 1 made the canary record `reactNativeRuntime`, `executionEnvironment` and `expoGoVersion` (renamed `expoGoBuild` in commit 2); the re-run (section 8, step 2) supplies the exact values in the same report, so no pin comes from a screenshot.
 
 ## 5. Design
 ### 5.1 Redirect-verification registry (data only)
@@ -136,7 +138,7 @@ Existing tests of the boolean (`transport.test.ts`, `runtime.test.ts`, `harness.
 ## 9. Commit sequence
 | # | Commit | State of the gate |
 |---|---|---|
-| 1 | **DONE `e4f6331`:** canary evidence records `reactNativeRuntime`, `executionEnvironment`, `expoGoVersion` | unchanged (closed) |
+| 1 | **DONE `e4f6331`:** canary evidence records `reactNativeRuntime`, `executionEnvironment`, `expoGoVersion` (later renamed `expoGoBuild`) | unchanged (closed) |
 | - | **Your step (approved, in progress):** re-run the iPhone canary on the same Expo Go 58.0.5 with the new build and send the updated evidence. **Commits 2 and 3 do not start until you have reviewed it.** | unchanged |
 | 2 | `refactor(mobile): redirect-verification evaluator; authentication stays blocked`: runtime facts, evaluator, **empty** `redirectVerifications.json`, the two-key `credentialsAllowed`, runtime seams, UI rows, tests of section 8. **The boolean stays `false` and is mandatory.** | closed everywhere |
 | 3 | `ci(mobile): add check:native-gate and the authorisation checklist`: the guard with negative tests, `NATIVE_AUTH_AUTHORISATION.md` (R1-R11, all NOT MET) | closed everywhere |

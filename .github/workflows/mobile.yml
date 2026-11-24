@@ -34,6 +34,7 @@ jobs:
         run: |
           npm run check:sdk
           npm run check:transport
+          npm run check:native-gate
           npm run typecheck
           npm run lint
           npm run format:check

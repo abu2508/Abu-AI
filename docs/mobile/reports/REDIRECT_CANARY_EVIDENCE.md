@@ -87,5 +87,5 @@ There is **no `B  RECEIVED` line**: the second origin received nothing, and the 
 
 ### 7.3 Notes
 - The new fields are confirmed readable in Expo Go SDK 58: SDK 58.0.0, React Native runtime 0.88.0, `storeClient`, iOS 27.2.
-- Proposal, not yet changed: rename `expoGoVersion` to `expoGoBuild`, so it is not mistaken for 58.0.5. Awaiting owner agreement.
+- Owner approved renaming `expoGoVersion` to `expoGoBuild` (the value above is a build identifier, not 58.0.5) and keeping a separate `expoGoMarketingVersion`, recorded by hand from Expo Go's Settings screen and never derived from the build value. The app now reports `expoGoMarketingVersion: null`. The run above used the old field name, `expoGoVersion`.
 - Scope is unchanged from sections 5 and 6: redirect behaviour only, one device, Expo Go only. It does not authorise authenticated requests and does not clear any production security gate (G1-G4).
