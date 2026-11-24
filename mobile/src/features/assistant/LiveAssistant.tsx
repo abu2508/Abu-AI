@@ -57,6 +57,7 @@ export function LiveAssistant() {
   const [showRecent, setShowRecent] = useState(false);
   const attempt = useRef<{ sig: string; key: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const inFlight = useRef(false); // state updates are batched: a ref stops a fast double press from sending twice
 
   const status = useApiQuery(
     ['home', 'status'],
@@ -104,7 +105,8 @@ export function LiveAssistant() {
 
   const submit = async (raw: string) => {
     const q = raw.trim();
-    if (!q || phase === 'thinking' || paused || wait > 0) return;
+    if (!q || inFlight.current || paused || wait > 0) return;
+    inFlight.current = true;
     setText(q);
     const sig = `${q}|${conv ?? ''}`;
     if (attempt.current?.sig !== sig) attempt.current = { sig, key: platformCrypto.randomKey() };
@@ -136,6 +138,8 @@ export function LiveAssistant() {
           () => void qc.invalidateQueries({ queryKey: userKey(rt.userId, 'asks', 'runs') }),
           3000,
         );
+    } finally {
+      inFlight.current = false;
     }
   };
 

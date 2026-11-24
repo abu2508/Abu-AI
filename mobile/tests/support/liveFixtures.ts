@@ -102,6 +102,7 @@ const RUN_BY_MESSAGE: Record<string, string> = {
   'Show my income and savings this month': 'run.finance.overview.a',
   'How much did I spend in total this month?': 'run.clarify.a',
   'Please transfer 5000 rupees to my friend': 'run.unsupported.a',
+  'Help me reply': 'run.messaging.not_shared.a',
 };
 export const MESSAGES = Object.keys(RUN_BY_MESSAGE);
 

@@ -121,7 +121,7 @@ describe('orchestrator envelope and the 18 tool results', () => {
     expect(parseToolEntry('coach.habits', { habits: [{ ...days, unit: 'weeks' }] }).kind).toBe('unreadable');
     const analyse = runData('run.messaging.reply_assist.a')['messaging.analyse'] as Record<string, unknown>;
     expect(parseToolEntry('messaging.analyse', analyse).kind).toBe('ok');
-    const { median_my_response_minutes: _a, median_their_response_minutes: _b, ...noMedian } = analyse;
+    const noMedian = Object.fromEntries(Object.entries(analyse).filter(([k]) => !k.startsWith('median_')));
     expect(parseToolEntry('messaging.analyse', noMedian).kind).toBe('ok'); // unreliable timestamps: keys absent
     expect(
       parseToolEntry('messaging.analyse', {
