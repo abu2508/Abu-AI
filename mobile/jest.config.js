@@ -13,5 +13,9 @@ module.exports = {
   coverageThreshold: {
     './src/auth/': { lines: 90, branches: 90, statements: 90, functions: 90 },
     './src/api/': { lines: 90, branches: 90, statements: 90, functions: 90 },
+    // M8.2: the card, live-data and countdown modules
+    './src/features/assistant/cards/': { lines: 90, branches: 90, statements: 90, functions: 90 },
+    './src/features/live/': { lines: 90, branches: 90, statements: 90, functions: 90 },
+    './src/lib/useCountdown.ts': { lines: 90, branches: 90, statements: 90, functions: 90 },
   },
 };
