@@ -18,8 +18,11 @@ Linux or Windows machine with no Xcode: JS/TS tooling, unit tests, Expo web and 
 | TestFlight / ad-hoc install | no | needs account | needs account | yes |
 | Maestro/Detox E2E | Maestro flows can be authored; running needs a simulator/device | yes | Maestro Cloud (optional, paid) | yes |
 
-Consequence: P0-P7 are largely Linux-friendly; P8 native work needs EAS (or a Mac) **and** a physical iPhone, and an Apple
-Developer Program membership for anything beyond the simulator. That cost is outside the AI budget and needs approval.
+Consequence: M8.0-M8.7 are largely Linux-friendly. M8.8 native work needs EAS (or a Mac) **and** a physical iPhone, and an Apple
+Developer Program membership for device installs and TestFlight.
+
+**Decision (recorded):** the Apple Developer Program purchase is **deferred**. Revisit at the start of M8.8, or earlier if you want device testing sooner.
+Until then: native code can be written and unit-tested against JS fakes (M8.8a) but is reported **"prepared, unverified"**; nothing native is claimed done without a device run (M8.8b).
 
 ## 2. Capability matrix
 
@@ -30,8 +33,8 @@ Developer Program membership for anything beyond the simulator. That cost is out
 | Background privacy blur | App switcher snapshot | JS blur overlay on `inactive` | no | n/a | device | Must trigger before snapshot |
 | Local notifications | Schedule, permission prompt | `expo-notifications` for reminders fetched from `/coach/reminders/due` | no | **G1** polling only | build in EAS dev client; device to verify | Background refresh limited; local only |
 | Remote push (APNs) | Needs APNs key + server sender | **not in M8** | no | **missing (G1)** | n/a | Needs backend work + paid account |
-| Share Extension (send text to Abu) | Share sheet text/URL from Messages, Mail, Safari | Swift extension target via config plugin; writes text into an **encrypted App Group inbox**; main app ingests via the authenticated API (`/finance/ingest` or messaging import) | **yes** | Existing endpoints; **G8** scoped credential missing | write in Codespaces; compile in EAS; **verify on device** | Extensions must not hold refresh tokens (rotation race). Until G8, hand-off requires opening the app |
-| Shortcuts / App Intents | "Add to Abu" intent; Shortcuts automation on "Message received" can pass the text | Swift App Intents in the main app target (opens app in foreground or runs in app process), calling `ingest` | **yes** | Existing `ingest`; G8 for headless runs | EAS build; **device only** | Automations may require user confirmation depending on iOS version/settings; must be verified on device; cannot read other apps' notifications |
+| Share Extension (send text to Abu) | Share sheet text/URL from Messages, Mail, Safari | Swift extension target via config plugin; writes text into an **encrypted App Group inbox**; the **main app** drains it and calls the authenticated API (`/finance/ingest` or messaging import). **G8 deferred by decision: extensions never hold or rotate credentials** | **yes** | Existing endpoints only | write in Codespaces; compile in EAS; **verify on device** | Extensions must not hold refresh tokens (rotation race). Capture is delivered when the user next opens Abu |
+| Shortcuts / App Intents | "Add to Abu" intent; Shortcuts automation on "Message received" can pass the text | Swift App Intents in the main app target (opens app in foreground or runs in app process), calling `ingest` | **yes** | Existing `ingest` (runs in the app process; no headless credential) | EAS build; **device only** | Automations may require user confirmation depending on iOS version/settings; must be verified on device; cannot read other apps' notifications |
 | Bank notification capture | iOS exposes **no** API to read other apps' notifications | Only: Shortcuts automation on SMS received, share-sheet, paste, forward. Stated plainly in onboarding | n/a | `POST /finance/ingest` | device | User expectation management |
 | EventKit (calendar read) | Read events after permission | `expo-calendar` -> build ICS payload on device -> `POST /coach/calendar/import`; read-only | no (JS module) but needs dev build | ICS import exists; no bulk JSON | EAS dev client + device with a **synthetic** calendar | Real calendar data is blocked until gates verified; use a dedicated synthetic calendar only |
 | Reminders (EventKit reminders) | Read/write system Reminders | **Not planned** (use Abu's own reminders + local notifications) | n/a | n/a | n/a | Avoids extra permission and data flow |
@@ -51,10 +54,9 @@ Developer Program membership for anything beyond the simulator. That cost is out
 ## 3. The extension boundary (why it is built this way)
 
 The backend rotates refresh tokens and kills a session on reuse. If an extension and the app both refresh, one of them
-will present a stale token and the session dies. Therefore: **only the main app owns the refresh token.** Extensions
+will present a stale token and the session dies. Therefore: **only the main app owns the refresh token, and extensions hold no credential at all** (decision: G8 deferred). Extensions
 write plain data (shared text, an intent's text) into an App Group inbox encrypted with a key kept in the Keychain; the
-main app drains the inbox and performs the authenticated call. A future scoped, revocable, ingest-only device credential
-(G8, needs backend approval) would let extensions post directly without the refresh token.
+main app drains the inbox and performs the authenticated call. A scoped ingest-only device credential (G8) was considered and is **deferred**; the handoff design above does not depend on it. Consequence: an extension capture is delivered when the user next opens Abu (or when an App Intent runs in the app process).
 
 ## 4. Verification plan for items that cannot be tested here
 

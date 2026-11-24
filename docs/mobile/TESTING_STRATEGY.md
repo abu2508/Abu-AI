@@ -2,6 +2,8 @@
 
 All testing uses synthetic data and the mock model. Real finance, messaging, calendar and personal data are never used.
 
+See also [PHASE_MILESTONES](PHASE_MILESTONES.md): the **test report format** delivered at every sub-milestone gate and the **continuous security and privacy checks** (sections B and C there) are part of this strategy.
+
 ## 1. Test pyramid
 
 | Layer | Tooling (candidates) | What it covers | Runs in Codespaces/Linux? | Runs in CI |
@@ -79,6 +81,15 @@ accessibility defects are phase-blocking at "serious" severity.
 | Secrets in bundle | none; only a base URL | bundle scan in CI |
 | Backend controls | the app does not bypass or duplicate them (kill switch, approvals, limits stay server-side) | contract tests; "no weakening" review in every phase |
 | Premature real data | synthetic chip, URL allowlist, gates BLOCKED text; fixtures are synthetic | review checklist; CI check that fixtures contain no real-looking identifiers |
+
+## 4b. Where tests run given the approved development setup
+
+- Backend-dependent tests (contract, Playwright E2E on the web build) run **inside Codespaces** against the Docker backend (no network exposure needed).
+- The phone, if used, runs **demo mode** (fixtures, no credentials) via Expo Go; real-backend-on-phone checks are deferred (see BACKEND_PREREQUISITES).
+- A test asserts demo mode cannot be compiled into a production profile and that the production-URL block holds while the gates are BLOCKED.
+- Supply-chain gates in CI: `npm audit`, licence allowlist, install-script allowlist, lockfile integrity, bundle secret scan.
+- OpenAPI drift: the committed snapshot must match the backend (backend test, task B2) and the generated types must be up to date.
+- B1/B2 are validated by their own backend test suites plus the unchanged full backend regression run.
 
 ## 5. Quality gates per phase
 

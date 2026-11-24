@@ -44,41 +44,25 @@ mobile/
     lib/                       money.ts (string/BigInt paise, formatting only), dates.ts, base64.ts, clipboard.ts, logger.ts (redacting)
     native/                    TS bridges + JS fakes: shareInbox, appIntents, speech (interfaces; Swift behind them)
     config/                    env.ts (build profile), backendAllowlist.ts, featureFlags.ts (gates, synthetic banner)
-    testing/                   synthetic fixtures, msw handlers, render helpers, a11y helpers
+    testing/                   synthetic fixtures, msw handlers, render helpers, a11y helpers, demo-mode adapter (fixtures, no network)
   modules/                     Expo local native modules (Swift): added in P8 only
   targets/                     Apple extension targets via config plugin (Share Extension, App Intents): P8 only
   e2e/                         Maestro flows
-  scripts/                     contrast-check, token export, (later) openapi snapshot -> types
+  openapi/openapi.json         committed OpenAPI snapshot (exported offline from the backend, see BACKEND_PREREQUISITES B2)
+  scripts/                     contrast-check, token export, licence/audit/fixture scanners, openapi-typescript -> src/api/generated
   app.config.ts  eas.json  tsconfig.json  eslint.config  jest.config
 ```
 
 Rules: routes contain no business logic; features never import from each other (shared code goes to `lib/`,
 `design/` or `api/`); only `src/api` calls `fetch`; only `src/auth` touches secrets; only `src/native` touches native modules.
 
-## 3. Candidate dependencies (none installed; each reviewed at P0 for licence, maintenance and permissions)
+## 3. Dependencies
 
-| Concern | Candidate | Why / note |
-|---|---|---|
-| Framework | `expo`, `expo-router`, `react-native` (SDK pinned at P0) | decided |
-| Language | TypeScript strict + `noUncheckedIndexedAccess` | decided |
-| Server state | `@tanstack/react-query` (in-memory only, no persister) | caching, retries, invalidation |
-| UI state | `zustand` | tiny; appearance, lock, ephemeral UI |
-| Validation | `zod` | runtime-validate every response; types inferred |
-| Secrets | `expo-secure-store` (Keychain) | refresh token; `WHEN_UNLOCKED_THIS_DEVICE_ONLY` |
-| Biometrics | `expo-local-authentication` | optional app lock |
-| Animation | `react-native-reanimated`, `react-native-gesture-handler` | orb, transitions (worklets) |
-| Graphics/charts | `@shopify/react-native-skia` | orb glow, area/ring/bars; accessible alternatives separate |
-| Blur/material | `expo-blur` | tab bar, sheets, background privacy blur |
-| Haptics | `expo-haptics` | restrained feedback |
-| Files | `expo-document-picker` (+ `expo-file-system` read only) | statement/ICS/chat import, no persistence |
-| Camera (optional) | `expo-camera` | scan the enrollment QR |
-| Notifications | `expo-notifications` | local reminders (G1: no remote push) |
-| Calendar | `expo-calendar` | EventKit read (P8, device-tested) |
-| Speech | native module over `SFSpeechRecognizer` on-device (P8) | transcript only is sent |
-| Testing | `jest-expo`, `@testing-library/react-native`, `msw`, Maestro, Playwright (web gallery) | see TESTING_STRATEGY |
-| Lint | `eslint` + `eslint-plugin-react-native-a11y`, `typescript-eslint` | a11y rules in CI |
-
-Explicitly **not** included: analytics, ads, crash-reporting SDKs, social login, any AI SDK, any push vendor.
+The full candidate register (exact versions, purpose, licences, maintenance, security notes, alternatives) is
+[DEPENDENCY_REGISTER](DEPENDENCY_REGISTER.md). Nothing is installed until you approve it. Headlines: Expo SDK 57 (recommended) with the
+SDK-bundled React Native and native modules; TanStack Query (in-memory only), Zustand, Zod; `expo-secure-store` for the refresh token;
+Reanimated + Skia for the Abu presence and charts; `react-native-svg` for the original icon set; Jest, Testing Library, MSW, Playwright
+for tests; **no** analytics, crash reporting, remote logging, AI SDKs or push vendors.
 
 ## 4. Navigation structure (Expo Router)
 
@@ -128,7 +112,7 @@ State machine: `unenrolled -> enrolling -> active <-> refreshing -> expired -> (
   without tripping reuse detection. On success the new refresh token replaces the old atomically. On `401` from refresh
   the session is `expired`: wipe Keychain, return to enrollment.
 - **401 on an API call:** one refresh attempt, one retry; a second 401 ends the session.
-- **Extensions never refresh** (rotation race): see IOS_CAPABILITY_MATRIX and gap G8.
+- **Extensions never hold or rotate credentials** (rotation race). G8 (a scoped ingest credential) is **deferred by decision**; the main-app handoff architecture stays.
 - **Logout:** `POST /auth/logout`, then wipe secrets; "sign out other devices" uses `DELETE /auth/sessions/{id}`.
 - **Storage:** Keychain `WHEN_UNLOCKED_THIS_DEVICE_ONLY`; nothing synced to iCloud; no refresh token in AsyncStorage,
   logs, deep links or route params.
@@ -156,10 +140,21 @@ main app, which performs the authenticated API call. This keeps tokens out of ex
 
 ## 9. Configuration and gates
 
-- Build profiles: `dev` (dev client, synthetic backend URL), `preview` (internal), `production` (blocked in M8).
+- Build profiles: `dev` (private Codespaces URL or demo mode), `preview` (internal), `production` (blocked in M8).
+- **Demo mode** (dev/preview only): the API client is swapped for a fixtures adapter with synthetic data and no network, so the phone can run the full UI without any backend credential (BACKEND_PREREQUISITES option B). It is impossible to enable in a production profile (compile-time flag + test).
 - `featureFlags.productionGatesVerified = false` is compiled in; while false, a persistent **"Synthetic data only"** chip
   shows in the header and Settings > About lists the four gates as BLOCKED; production backend URLs are rejected.
 - No secrets in the bundle: the app contains only a base URL. All credentials are per-device tokens issued at enrollment.
+
+## 9b. Typed API client and OpenAPI
+
+Types are generated by `openapi-typescript` from the **committed offline snapshot** (backend task B2); runtime validation is zod, hand-written per
+endpoint and checked against the live backend by contract tests (the snapshot cannot express every invariant, for example "money is a string"). A CI job fails when the
+snapshot is stale relative to the backend. The mobile build never calls a live OpenAPI endpoint.
+
+## 9c. Messaging inbox
+
+The inbox uses the new batch endpoint `GET /v1/messaging/inbox` (backend task B1), one paged request, no per-row analysis calls.
 
 ## 10. Observability (privacy-preserving)
 

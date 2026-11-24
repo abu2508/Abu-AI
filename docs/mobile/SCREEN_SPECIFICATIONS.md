@@ -2,7 +2,7 @@
 
 Conventions
 - Every screen defines: purpose, content, actions, states (loading / empty / error / offline / kill-switch), accessibility, endpoints.
-- Endpoints are real (M1-M7). **GAP** = no backend support; the screen is degraded or deferred (see MILESTONE_8_PLAN section 4).
+- Endpoints are real (M1-M7) except where marked **B1** (planned, approved-in-principle backend task). **GAP** = no backend support; the screen is degraded or deferred (see MILESTONE_8_PLAN section 4).
 - Common states: `401` -> silent refresh then retry, else the session-expired flow; `503 kill_switch_active` -> the
   emergency-stop banner (agent features only); `429` -> "slow down" with retry; offline -> banner + stale data if in memory.
 - Money values are strings. All destructive actions confirm. All lists are in-memory cached only.
@@ -30,7 +30,7 @@ Purpose: a calm, uncluttered "today" surface. Cards are independent queries (G3)
 | Today (Coach) | Next event, top 3 planned tasks, habits still open | Open Coach | `GET /coach/briefing` |
 | Money snapshot | Month income/spend/net, savings rate, pending-review count | Open Finance | `GET /finance/summary`, `GET /finance/upcoming` |
 | Insights | Top 3 insights (severity-ordered) | Open Finance > Insights | `GET /finance/insights` |
-| Needs reply | Shared conversations awaiting a reply | Open conversation | `GET /messaging/conversations` + per-row `GET .../analysis` (**G5**) |
+| Needs reply | Conversations awaiting a reply | Open conversation | `GET /messaging/inbox?limit=5` (**B1**, planned backend task; closes G5) |
 | Reminders due | Due reminders | Ack / dismiss | `GET /coach/reminders/due`, `POST /coach/reminders/{id}/{ack|dismiss}` |
 | Quick actions | Ask Abu, Add expense, Log habit, Import chat | Navigate | none |
 | Avatar | Opens Settings | | `GET /me` |
@@ -114,9 +114,9 @@ Endpoints: `GET/POST /finance/subscriptions`, `POST /finance/subscriptions/{id}/
 ## 5. Messaging
 
 ### 5.1 Inbox
-Imported conversations: platform glyph, title, message count, last message time, shared-with-Abu badge, needs-reply
-badge (lazy per row, **G5**). Empty state explains import-only and that nothing is ever sent.
-Endpoints: `GET /messaging/conversations` (+ `.../analysis`).
+Imported conversations: platform glyph, title, message count, last message time, shared-with-Abu badge, needs-reply badge
+and waiting time (only when timestamps are reliable). Paged (50 per page) from **one** request. Empty state explains import-only and that nothing is ever sent.
+Endpoints: `GET /messaging/inbox` (**B1**, planned; implemented before this screen). `GET /messaging/conversations` remains available.
 
 ### 5.2 Conversation
 Messages (decrypted for the owner, paged), analysis strip (needs reply, response times, last intent, tone), controls:

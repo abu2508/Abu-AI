@@ -79,13 +79,14 @@ Other scales:
   `BarList` (budgets), `HabitHeat` (30-day grid), `PlanTimeline`. Rules: no 3D, no gratuitous gradients, direct labelling,
   colour never the only signal, values announced as text, optional data table.
 
-## 6. Icons
+## 6. Icons (decision recorded: approved)
 
-- Brand and domain glyphs, the Bloom and state glyphs: **original SVG set** authored for Abu (own artwork).
-- Generic system glyphs (chevrons, share, trash, settings): Apple's SF Symbols via the platform API, used as licensed for
-  Apple-platform apps, not copied as assets. **Needs your approval** (MILESTONE_8_PLAN decision 3). If you prefer zero Apple
-  glyph dependence, a small original set covers the same needs at extra cost.
-- One stroke weight and optical size per glyph set; every icon has an accessibility label or is hidden as decorative.
+- **Original Abu artwork** for the Bloom mark, the brand and state glyphs, and the **domain icons for Finance, Messaging and Daily Coach** (own SVG
+  set, committed with provenance notes). These carry the identity.
+- **Apple SF Symbols** for generic system functions only (chevrons, share, trash, settings, search, add, close). Used through the platform API as licensed
+  for Apple-platform apps, never copied or redistributed as assets. The web gallery uses neutral stand-ins.
+- One stroke weight and optical size per glyph set; every icon has an accessibility label or is hidden as decorative; icon colour comes from tokens.
+- Dependencies for this: `react-native-svg` (original set) and `expo-symbols` (see DEPENDENCY_REGISTER).
 
 ## 7. The Abu presence (AI activity feedback)
 
