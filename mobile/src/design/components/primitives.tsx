@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -73,11 +74,16 @@ export function Screen({
   scroll = true,
   padded = true,
   bottomInset = 0,
+  onRefresh,
+  refreshing = false,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   padded?: boolean;
   bottomInset?: number;
+  /** Pull to refresh (only when provided). */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -94,6 +100,7 @@ export function Screen({
       contentContainerStyle={content}
       contentInsetAdjustmentBehavior="never"
       keyboardShouldPersistTaps="handled"
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
     >
       {children}
     </ScrollView>

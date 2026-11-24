@@ -19,6 +19,7 @@ type Fault =
   | { kind: 'before'; error?: 'network' | 'abort' } // request never reaches the server
   | { kind: 'lost'; error?: 'network' | 'abort' } // the server processes it, the response is lost
   | { kind: 'status'; status: number; headers?: Record<string, string> }
+  | { kind: 'json'; status: number; body: unknown; headers?: Record<string, string> }
   | { kind: 'redirect'; status?: number }
   | { kind: 'offsite' }
   | { kind: 'badjson' }
@@ -38,6 +39,14 @@ export function mkRes(
     headers: { get: (k: string) => h[k] ?? h[k.toLowerCase()] ?? null },
     json: () => Promise.resolve(body),
   } as unknown as Response;
+}
+
+export interface RouteCtx {
+  headers: Record<string, string>;
+  body: unknown;
+  query: URLSearchParams;
+  path: string;
+  userId: string;
 }
 
 interface Sess {
@@ -60,6 +69,9 @@ export class FakeBackend {
   log: Logged[] = [];
   faults: { match: RegExp; fault: Fault }[] = [];
   serverHits = 0;
+  /** Extra authenticated routes (Home reads, orchestrator): `METHOD /path` or a regexp over `METHOD /path`. */
+  routes = new Map<string, (r: RouteCtx) => Response>();
+  patterns: [RegExp, (r: RouteCtx) => Response][] = [];
   ttl = 600;
   private n = 0;
 
@@ -97,7 +109,13 @@ export class FakeBackend {
     return s && !s.revoked ? s : null;
   }
 
-  handle(method: string, path: string, headers: Record<string, string>, body: unknown): Response {
+  handle(
+    method: string,
+    path: string,
+    headers: Record<string, string>,
+    body: unknown,
+    query = new URLSearchParams(),
+  ): Response {
     this.serverHits += 1;
     const b = (body ?? {}) as Record<string, string>;
     if (method === 'POST' && path === '/v1/auth/enroll') {
@@ -133,6 +151,9 @@ export class FakeBackend {
     }
     const s = this.auth(headers);
     if (!s) return mkRes(401, { detail: 'unauthorized' });
+    const custom =
+      this.routes.get(`${method} ${path}`) ?? this.patterns.find(([rx]) => rx.test(`${method} ${path}`))?.[1];
+    if (custom) return custom({ headers, body, query, path, userId: s.userId });
     if (method === 'GET' && path === '/v1/me') return mkRes(200, { user_id: s.userId, session_id: s.id });
     if (method === 'POST' && path === '/v1/auth/logout') {
       s.revoked = true;
@@ -180,9 +201,11 @@ export class FakeBackend {
     if (fault?.kind === 'before') throw err(fault.error);
     if (fault?.kind === 'status')
       return mkRes(fault.status, { detail: 'x' }, { ...(fault.headers ? { headers: fault.headers } : {}) });
+    if (fault?.kind === 'json')
+      return mkRes(fault.status, fault.body, { ...(fault.headers ? { headers: fault.headers } : {}) });
     if (fault?.kind === 'redirect')
       return mkRes(fault.status ?? 302, undefined, { headers: { Location: 'https://evil.example/' } });
-    const real = this.handle(init.method ?? 'GET', u.pathname, headers, body);
+    const real = this.handle(init.method ?? 'GET', u.pathname, headers, body, u.searchParams);
     if (fault?.kind === 'lost') throw err(fault.error);
     if (fault?.kind === 'offsite') return mkRes(real.status, await real.json(), { url: 'https://evil.example/v1/me' });
     if (fault?.kind === 'badjson')

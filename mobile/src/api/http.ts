@@ -32,6 +32,8 @@ export interface RequestSpec<T> {
   headers?: Record<string, string>;
   /** Query parameters: keys are lowercase identifiers, values are primitives; all are URL-encoded here. */
   query?: Record<string, string | number | boolean>;
+  /** Per-request timeout override in ms (a governed orchestrator run can take up to ~30 s). */
+  timeoutMs?: number;
   /** Overrides the connected origin (enrollment targets the chosen approved backend before it is "connected"). */
   originOverride?: string;
 }
@@ -143,7 +145,7 @@ export function createHttp(cfg: HttpConfig) {
       cfg.log?.({ method: spec.method, route: spec.route, status, ms: now() - started, ...(code ? { code } : {}) });
 
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(() => ctrl.abort(), spec.timeoutMs ?? timeoutMs);
     let res: Response;
     try {
       res = await cfg.transport(url, {

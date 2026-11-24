@@ -17,15 +17,25 @@ import {
 } from '@/design';
 import { TAB_BAR_HEIGHT } from '@/design/components/TabBar';
 import { formatInr } from '@/lib/money';
+import { useAuthStatus } from '@/auth/statusStore';
+import { Banner } from '@/design';
+import { LiveHome } from './LiveHome';
+import { useLiveMode } from '../live/useLive';
 import { coach, finance, inbox } from '@/testing/fixtures';
 
-export function HomeScreen() {
+function DemoHome() {
   const router = useRouter();
   const { colors } = useTheme();
   const waiting = inbox.filter((i) => i.needs_reply);
+  const status = useAuthStatus();
   return (
     <Screen bottomInset={TAB_BAR_HEIGHT + 40}>
       <ScreenHeader title="Good morning" subtitle="Your day, calmly (demo)" settings />
+      {status === 'expired' ? (
+        <Banner tone="warning" title="Session ended">
+          The connection was closed, so this screen shows demo data. Reconnect from Settings, Development connection.
+        </Banner>
+      ) : null}
       <Card accent="brand">
         <Row>
           <AbuOrb size={48} />
@@ -88,4 +98,10 @@ export function HomeScreen() {
       </Section>
     </Screen>
   );
+}
+
+/** Live data when connected (web and Jest; the native credential gate keeps the iPhone in demo mode), otherwise demo. */
+export function HomeScreen() {
+  const { live } = useLiveMode();
+  return live ? <LiveHome /> : <DemoHome />;
 }

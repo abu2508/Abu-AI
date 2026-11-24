@@ -17,6 +17,8 @@ import {
 } from '@/design';
 import { radius, space } from '@/design/tokens';
 import { assistant } from '@/testing/fixtures';
+import { LiveAssistant } from './LiveAssistant';
+import { useLiveMode } from '../live/useLive';
 
 type Phase = 'idle' | 'thinking' | 'done';
 const ORB: Record<Phase, OrbState> = { idle: 'idle', thinking: 'thinking', done: 'done' };
@@ -25,7 +27,7 @@ const ORB: Record<Phase, OrbState> = { idle: 'idle', thinking: 'thinking', done:
  * "Ask Abu" command-surface SHELL (M8.0). It does not call the backend: submitting plays a local, clearly-labelled
  * demo. The orb's "thinking" state here reflects only the demo timer, never invented progress steps.
  */
-export function AssistantScreen() {
+function DemoAssistant() {
   const { colors } = useTheme();
   const router = useRouter();
   const [text, setText] = useState('');
@@ -92,4 +94,10 @@ export function AssistantScreen() {
       ) : null}
     </Screen>
   );
+}
+
+/** Live Ask Abu when connected (web and Jest; the native credential gate keeps the iPhone in the demo), otherwise the local demo. */
+export function AssistantScreen() {
+  const { live } = useLiveMode();
+  return live ? <LiveAssistant /> : <DemoAssistant />;
 }

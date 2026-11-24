@@ -18,5 +18,10 @@ export function useConnection() {
   const rt = getRuntime();
   const status = useAuthStatus();
   const online = useOnline(rt.connectivity);
-  return { status, online, label: status === 'authenticated' ? rt.backendLabel : null, userId: rt.userId };
+  return {
+    status,
+    online,
+    label: status === 'authenticated' && !rt.nativeBlocked ? rt.backendLabel : null,
+    userId: rt.userId,
+  };
 }

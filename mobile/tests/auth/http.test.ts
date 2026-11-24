@@ -245,3 +245,56 @@ describe('ApiError', () => {
     expect(new ApiError('unauthorized').status).toBeUndefined();
   });
 });
+
+describe('API client: backend error envelopes (B3 contracts)', () => {
+  const err = async (status: number, body: unknown, headers: Record<string, string> = {}) => {
+    const { send } = client({ respond: () => mkRes(status, body, { headers }) });
+    return (await send(spec).catch((x: unknown) => x)) as ApiError;
+  };
+  it('reads only the whitelisted error.code, never the message', async () => {
+    const e = await err(503, { error: { code: 'kill_switch_active', message: 'secret server text' } });
+    expect(e.code).toBe('kill_switch');
+    expect(e.serverCode).toBe('kill_switch_active');
+    expect(e.message).not.toMatch(/secret/);
+    expect((await err(503, { error: { code: 'something_new', message: 'x' } })).serverCode).toBeUndefined();
+    expect((await err(503, { detail: 'service unavailable' })).code).toBe('service_unavailable');
+    expect((await err(503, 'not an object')).code).toBe('service_unavailable');
+  });
+  it('splits the two 429 meanings by body shape', async () => {
+    const rate = await err(429, { detail: 'rate limit exceeded' }, { 'Retry-After': '12' });
+    expect(rate).toMatchObject({ code: 'rate_limited', retryAfterSeconds: 12 });
+    for (const code of ['spending_blocked', 'limit_exceeded']) {
+      const lim = await err(429, { error: { code, message: 'm' } });
+      expect(lim).toMatchObject({ code: 'limit_reached', serverCode: code });
+      expect(lim.retryAfterSeconds).toBeUndefined();
+    }
+  });
+  it('maps run-level codes: 409, 403, 502', async () => {
+    expect(await err(409, { error: { code: 'request_in_progress', message: 'm' } })).toMatchObject({
+      code: 'conflict',
+      serverCode: 'request_in_progress',
+    });
+    expect(await err(403, { error: { code: 'governance_refused', message: 'm' } })).toMatchObject({
+      code: 'forbidden',
+      serverCode: 'governance_refused',
+    });
+    expect(
+      await err(502, {
+        error: { code: 'malformed_output', message: 'm' },
+        run_id: 'x',
+        execution_id: null,
+        trace_id: null,
+      }),
+    ).toMatchObject({ code: 'bad_gateway', serverCode: 'malformed_output' });
+  });
+  it('encodes query parameters and rejects unsafe keys', async () => {
+    const { send, calls } = client();
+    await send({ ...spec, query: { year: 2026, month: 10, q: 'a b&c' } });
+    expect(calls[0]!.url).toBe(`${ORIGIN}/v1/me?year=2026&month=10&q=a%20b%26c`);
+    await expect(send({ ...spec, query: { 'bad key': 1 } })).rejects.toMatchObject({ code: 'bad_request' });
+    await expect(send({ ...spec, query: { 'x=1&y': 1 } })).rejects.toMatchObject({ code: 'bad_request' });
+    const none = client();
+    await none.send({ ...spec, query: {} });
+    expect(none.calls[0]!.url).toBe(`${ORIGIN}/v1/me`);
+  });
+});

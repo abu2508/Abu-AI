@@ -30,3 +30,13 @@ export function formatInr(amount: string, opts: { sign?: boolean } = {}): string
   if (neg) return `-${body}`;
   return opts.sign && paise > 0n ? `+${body}` : body;
 }
+
+/** Display helper for live API amounts: a malformed value shows an em dash instead of crashing or guessing. */
+export function safeInr(amount: string | null | undefined, opts: { sign?: boolean } = {}): string {
+  if (amount == null) return '—';
+  try {
+    return formatInr(amount, opts);
+  } catch {
+    return '—';
+  }
+}

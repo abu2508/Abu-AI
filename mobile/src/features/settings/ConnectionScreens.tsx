@@ -118,9 +118,15 @@ export function ConnectionScreen() {
 
       {conn.status === 'authenticated' ? (
         <>
-          <Banner tone="info" title="Connected to a development backend">
-            {conn.label}. Synthetic data only; the production security gates are still blocked.
-          </Banner>
+          {rt.nativeBlocked ? (
+            <Banner tone="warning" title="A saved connection exists but is disabled">
+              Nothing is sent from this device. Sign out to remove the saved connection.
+            </Banner>
+          ) : (
+            <Banner tone="info" title="Connected to a development backend">
+              {conn.label}. Synthetic data only; the production security gates are still blocked.
+            </Banner>
+          )}
           <Card>
             <ListRow
               title="Devices and sessions"

@@ -19,7 +19,7 @@ export function makeWorld(over: Partial<RuntimeDeps> = {}) {
       credentials: createCredentialVault(keychain),
       crypto: nodeCrypto,
       connectivity: net,
-      queryClient: createQueryClient(),
+      queryClient: createQueryClient({ retryDelayMs: 0 }),
       tokens: createTokenVault(() => server.clock),
       now: () => server.clock,
       sleep: (ms) => {
