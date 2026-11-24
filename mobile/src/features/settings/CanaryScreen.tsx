@@ -4,7 +4,14 @@ import Constants from 'expo-constants';
 
 import { defaultTransport, isExpoFetchTransport, RN_FETCH_FORCED } from '@/api/transport';
 import { Banner, Button, Card, EmptyState, Screen, SyntheticChip, Text, TextField } from '@/design';
-import { parseCanaryUrl, runCanary, type CanaryReport } from './canary';
+import {
+  describeRuntime,
+  parseCanaryUrl,
+  runCanary,
+  type CanaryReport,
+  type RuntimeConstants,
+  type RuntimePlatform,
+} from './canary';
 
 declare const __DEV__: boolean;
 
@@ -44,10 +51,7 @@ export function CanaryScreen() {
     ? JSON.stringify(
         {
           generatedAt: stamp,
-          platform: Platform.OS,
-          osVersion: String(Platform.Version),
-          expoSdk: Constants.expoConfig?.sdkVersion ?? null,
-          appOwnership: (Constants as { appOwnership?: string | null }).appOwnership ?? null,
+          ...describeRuntime(Platform as unknown as RuntimePlatform, Constants as unknown as RuntimeConstants),
           transport: { expoFetch: isExpoFetchTransport(), rnFetchForced: RN_FETCH_FORCED },
           overall: report.overall,
           statuses: report.perStatus.map((p) => ({

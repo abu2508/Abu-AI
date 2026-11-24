@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 
 import type { Transport } from '@/api/http';
-import { isPrivateIPv4 as appIsPrivate, parseCanaryUrl, runCanary } from '@/features/settings/canary';
+import { describeRuntime, isPrivateIPv4 as appIsPrivate, parseCanaryUrl, runCanary } from '@/features/settings/canary';
 import { nodeFetch } from '../support/nodeFetch';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -162,5 +162,67 @@ describe('the canary reports PASS only when the second origin receives nothing',
     expect(c.report().overall).toBe('INCONCLUSIVE'); // no evidence after a reset
     const rep = (await (await nodeFetch(`${c.aOrigin}/report`, {})).json()) as { overall: string };
     expect(rep.overall).toBe('INCONCLUSIVE');
+  });
+});
+
+describe('runtime facts recorded with the evidence (describeRuntime)', () => {
+  const expoGo = {
+    executionEnvironment: 'storeClient',
+    expoVersion: '58.0.5',
+    appOwnership: 'expo',
+    expoConfig: { sdkVersion: '58.0.0' },
+  };
+
+  it('records the native React Native runtime, the execution environment and the Expo Go version', () => {
+    const f = describeRuntime(
+      {
+        OS: 'ios',
+        Version: '27.2',
+        constants: { reactNativeVersion: { major: 0, minor: 88, patch: 0, prerelease: null } },
+      },
+      expoGo,
+    );
+    expect(f).toEqual({
+      platform: 'ios',
+      osVersion: '27.2',
+      expoSdk: '58.0.0',
+      appOwnership: 'expo',
+      executionEnvironment: 'storeClient',
+      expoGoVersion: '58.0.5',
+      reactNativeRuntime: '0.88.0',
+    });
+  });
+  it('keeps a prerelease tag and accepts a numeric OS version', () => {
+    const f = describeRuntime(
+      {
+        OS: 'ios',
+        Version: 26,
+        constants: { reactNativeVersion: { major: 0, minor: 89, patch: 0, prerelease: 'rc.1' } },
+      },
+      expoGo,
+    );
+    expect(f.reactNativeRuntime).toBe('0.89.0-rc.1');
+    expect(f.osVersion).toBe('26');
+  });
+  it('reports unreadable facts as null instead of guessing (a gate must fail closed on them)', () => {
+    expect(describeRuntime({ OS: 'ios', Version: '27.2' }, {})).toMatchObject({
+      expoSdk: null,
+      appOwnership: null,
+      executionEnvironment: null,
+      expoGoVersion: null,
+      reactNativeRuntime: null,
+    });
+    const garbage = { major: 'x' as unknown as number, minor: 1, patch: 2 };
+    expect(
+      describeRuntime({ OS: 'ios', Version: 1, constants: { reactNativeVersion: garbage } }, {}).reactNativeRuntime,
+    ).toBeNull();
+  });
+  it('does not pretend to be Expo Go: a standalone build reports its own environment', () => {
+    const f = describeRuntime(
+      { OS: 'ios', Version: '27.2' },
+      { executionEnvironment: 'standalone', expoVersion: null },
+    );
+    expect(f.executionEnvironment).toBe('standalone');
+    expect(f.expoGoVersion).toBeNull();
   });
 });

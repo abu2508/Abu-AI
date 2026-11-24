@@ -33,6 +33,9 @@ describe('Transport canary screen (debug only)', () => {
     expect(screen.getByText(/NOT a pass/)).toBeTruthy();
     expect(screen.getByText(/"expoFetch": true/)).toBeTruthy(); // evidence records which transport ran
     expect(screen.getByText(/"rnFetchForced": false/)).toBeTruthy();
+    // the evidence also records WHICH native runtime it was taken on (values come from the device; here only the keys matter)
+    for (const key of ['reactNativeRuntime', 'executionEnvironment', 'expoGoVersion', 'expoSdk', 'osVersion'])
+      expect(screen.getByText(new RegExp(`"${key}":`))).toBeTruthy();
   });
 
   it('does not exist in a release build', async () => {
