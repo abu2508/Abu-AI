@@ -41,13 +41,18 @@ def main() -> None:
     try:
         frozen = datetime.fromisoformat(raw)
     except ValueError:
-        sys.exit("contract-api: ABU_CONTRACT_NOW must be an ISO timestamp with an offset, e.g. 2026-11-24T06:30:00+00:00")
+        sys.exit(
+            "contract-api: ABU_CONTRACT_NOW must be an ISO timestamp with an offset, e.g. 2026-11-24T06:30:00+00:00"
+        )
     if frozen.tzinfo is None:
         sys.exit("contract-api: ABU_CONTRACT_NOW needs a UTC offset")
 
     # Same technique as tests/contracts/scenario.py::freeze_clock, applied to the process the contract tests call.
     CoachService.now = lambda self: frozen  # type: ignore[method-assign]
-    print(f"contract-api: CoachService clock frozen at {frozen.isoformat()} (test process only)", flush=True)
+    print(
+        f"contract-api: CoachService clock frozen at {frozen.isoformat()} (test process only)",
+        flush=True,
+    )
 
     uvicorn.run("services.api.main:create_app", factory=True, host=args.host, port=args.port)
 

@@ -163,8 +163,15 @@ async def test_enabling_paid_requires_budget_and_explicit_rate(g: Governance) ->
     assert (snap.usd_inr_rate, snap.rate_source) == (D("88.5"), "RBI reference, 2026-11-23")
 
 
-async def test_stale_rate_fails_closed(g: Governance, ctx: RunContext, clock: Clock) -> None:
+async def test_stale_rate_fails_closed(
+    g: Governance, ctx: RunContext, clock: Clock, session: AsyncSession
+) -> None:
     await enable_paid(g, rate="100")
+    # `set_rate` stamps the rate with the REAL clock, while this test drives the controller with an injected clock that
+    # starts on a fixed date. Put the stamp on the injected clock so the 14-day rule is evaluated on ONE timeline;
+    # otherwise the outcome would depend on the date the test happens to run.
+    await session.execute(text("UPDATE spending_config SET rate_set_at = :t"), {"t": clock.now})
+    await session.commit()
     await reserve(g, ctx)
     clock.now += timedelta(days=15)
     with pytest.raises(PaidSpendingBlockedError, match="stale"):
