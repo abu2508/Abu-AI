@@ -303,6 +303,201 @@
         "title": "AgentOut",
         "type": "object"
       },
+      "AnalyseTool": {
+        "additionalProperties": false,
+        "description": "`message_count: 0` (empty conversation) carries only the four required keys; the rest are optional.\nThe two median keys exist only when the conversation has reliable timestamps.",
+        "properties": {
+          "conversation_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "first_message_at": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First Message At"
+          },
+          "from_me": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "From Me"
+          },
+          "from_them": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "From Them"
+          },
+          "instruction_like_messages": {
+            "title": "Instruction Like Messages",
+            "type": "integer"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Message At"
+          },
+          "last_message_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Message Intent"
+          },
+          "last_sender": {
+            "anyOf": [
+              {
+                "enum": [
+                  "me",
+                  "them"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Sender"
+          },
+          "median_my_response_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Median My Response Minutes"
+          },
+          "median_their_response_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Median Their Response Minutes"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "my_style": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyStyle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "needs_reply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Needs Reply"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "their_tone": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TheirTone"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "topics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Up to 5 words derived from the other person's messages",
+            "title": "Topics"
+          },
+          "waiting_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Waiting Hours"
+          }
+        },
+        "required": [
+          "message_count",
+          "instruction_like_messages",
+          "conversation_id",
+          "platform"
+        ],
+        "title": "AnalyseTool",
+        "type": "object"
+      },
       "AppendIn": {
         "additionalProperties": false,
         "properties": {
@@ -422,6 +617,84 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "BlockOut": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "End",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "start": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "Start",
+            "type": "string"
+          },
+          "task_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "start",
+          "end",
+          "score",
+          "title"
+        ],
+        "title": "BlockOut",
+        "type": "object"
+      },
+      "BriefingPlan": {
+        "additionalProperties": false,
+        "description": "The briefing's plan: unlike `coach.plan` it has no `deferred` list.",
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockOut"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "free_minutes": {
+            "title": "Free Minutes",
+            "type": "integer"
+          },
+          "overloaded": {
+            "title": "Overloaded",
+            "type": "boolean"
+          },
+          "planned_minutes": {
+            "title": "Planned Minutes",
+            "type": "integer"
+          },
+          "unscheduled": {
+            "items": {
+              "$ref": "#/components/schemas/UnscheduledOut"
+            },
+            "title": "Unscheduled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "blocks",
+          "unscheduled",
+          "overloaded",
+          "planned_minutes",
+          "free_minutes"
+        ],
+        "title": "BriefingPlan",
+        "type": "object"
+      },
       "BudgetIn": {
         "additionalProperties": false,
         "properties": {
@@ -448,6 +721,72 @@
           "monthly_limit"
         ],
         "title": "BudgetIn",
+        "type": "object"
+      },
+      "BudgetRow": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "description": "\"*\" is the total-spending budget",
+            "title": "Category",
+            "type": "string"
+          },
+          "limit": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Limit",
+            "type": "string"
+          },
+          "pct": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Pct",
+            "type": "string"
+          },
+          "remaining": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Remaining",
+            "type": "string"
+          },
+          "spent": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Spent",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "over"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "limit",
+          "spent",
+          "remaining",
+          "pct",
+          "status"
+        ],
+        "title": "BudgetRow",
+        "type": "object"
+      },
+      "BudgetsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "budgets": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetRow"
+            },
+            "title": "Budgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "budgets"
+        ],
+        "title": "BudgetsTool",
         "type": "object"
       },
       "CallOut": {
@@ -629,6 +968,194 @@
         "title": "CallOut",
         "type": "object"
       },
+      "CardRow": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "healthy",
+                  "elevated",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "owed": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Owed",
+            "type": "string"
+          },
+          "utilisation_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilisation Pct"
+          }
+        },
+        "required": [
+          "account_id",
+          "label",
+          "owed",
+          "limit",
+          "utilisation_pct",
+          "band"
+        ],
+        "title": "CardRow",
+        "type": "object"
+      },
+      "CardsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/CardRow"
+            },
+            "title": "Cards",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cards"
+        ],
+        "title": "CardsTool",
+        "type": "object"
+      },
+      "CarryOver": {
+        "additionalProperties": false,
+        "properties": {
+          "due_date": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "due_date"
+        ],
+        "title": "CarryOver",
+        "type": "object"
+      },
+      "CashflowDay": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Balance",
+            "type": "string"
+          },
+          "date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Date",
+            "type": "string"
+          },
+          "net": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Net",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "net",
+          "balance"
+        ],
+        "title": "CashflowDay",
+        "type": "object"
+      },
+      "CashflowTool": {
+        "additionalProperties": false,
+        "properties": {
+          "closing": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Closing",
+            "type": "string"
+          },
+          "projected_month_expense": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless the window starts on day 1 of the month",
+            "title": "Projected Month Expense"
+          },
+          "projection_note": {
+            "title": "Projection Note",
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/CashflowDay"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "series",
+          "closing",
+          "projected_month_expense",
+          "projection_note"
+        ],
+        "title": "CashflowTool",
+        "type": "object"
+      },
       "CategoryIn": {
         "additionalProperties": false,
         "properties": {
@@ -690,6 +1217,70 @@
           "energy"
         ],
         "title": "CheckinIn",
+        "type": "object"
+      },
+      "CoachBriefing": {
+        "additionalProperties": false,
+        "description": "GET /v1/coach/briefing and tool `coach.briefing` (identical).",
+        "properties": {
+          "date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Date",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "goals_needing_attention": {
+            "items": {
+              "$ref": "#/components/schemas/GoalAttention"
+            },
+            "title": "Goals Needing Attention",
+            "type": "array"
+          },
+          "habits_open": {
+            "items": {
+              "$ref": "#/components/schemas/HabitOpen"
+            },
+            "title": "Habits Open",
+            "type": "array"
+          },
+          "mood_trend": {
+            "$ref": "#/components/schemas/MoodTrend"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/BriefingPlan"
+          },
+          "reminders_due": {
+            "items": {
+              "$ref": "#/components/schemas/ReminderOut"
+            },
+            "title": "Reminders Due",
+            "type": "array"
+          },
+          "streaks_at_risk": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Streaks At Risk",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "events",
+          "plan",
+          "habits_open",
+          "streaks_at_risk",
+          "goals_needing_attention",
+          "reminders_due",
+          "mood_trend"
+        ],
+        "title": "CoachBriefing",
         "type": "object"
       },
       "ConfirmIn": {
@@ -918,6 +1509,44 @@
         "title": "ConversationPatch",
         "type": "object"
       },
+      "DetailEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "DetailEnvelope",
+        "type": "object"
+      },
+      "DraftOut": {
+        "additionalProperties": false,
+        "properties": {
+          "option": {
+            "title": "Option",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option",
+          "tone",
+          "text"
+        ],
+        "title": "DraftOut",
+        "type": "object"
+      },
       "EnrollRequest": {
         "additionalProperties": false,
         "properties": {
@@ -960,6 +1589,40 @@
           "confirm"
         ],
         "title": "EraseBody",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared.",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Safe, content-free text. Clients should show their own wording.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
         "type": "object"
       },
       "EventIn": {
@@ -1006,6 +1669,60 @@
           "end"
         ],
         "title": "EventIn",
+        "type": "object"
+      },
+      "EventOut": {
+        "additionalProperties": false,
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "end": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "End",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "reminder_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Minutes"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "Start",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start",
+          "end",
+          "all_day",
+          "source",
+          "reminder_minutes"
+        ],
+        "title": "EventOut",
         "type": "object"
       },
       "ExecutionDetail": {
@@ -1206,6 +1923,142 @@
         "title": "ExecutionOut",
         "type": "object"
       },
+      "FinanceSummary": {
+        "additionalProperties": false,
+        "description": "GET /v1/finance/summary and tool `finance.summary` (identical).",
+        "properties": {
+          "end": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "End",
+            "type": "string"
+          },
+          "expense": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Expense",
+            "type": "string"
+          },
+          "expense_by_category": {
+            "description": "[category, amount] pairs, largest first; refunds can make an amount negative",
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "pattern": "^-?\\d+(\\.\\d+)?$",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Expense By Category",
+            "type": "array"
+          },
+          "income": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Income",
+            "type": "string"
+          },
+          "income_by_category": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "pattern": "^-?\\d+(\\.\\d+)?$",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Income By Category",
+            "type": "array"
+          },
+          "net": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Net",
+            "type": "string"
+          },
+          "pending_review_count": {
+            "description": "NOT included in the figures above",
+            "title": "Pending Review Count",
+            "type": "integer"
+          },
+          "savings_rate_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when income is 0",
+            "title": "Savings Rate Pct"
+          },
+          "start": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "income",
+          "expense",
+          "net",
+          "savings_rate_pct",
+          "expense_by_category",
+          "income_by_category",
+          "pending_review_count"
+        ],
+        "title": "FinanceSummary",
+        "type": "object"
+      },
+      "GoalAttention": {
+        "additionalProperties": false,
+        "properties": {
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "state",
+          "days_left"
+        ],
+        "title": "GoalAttention",
+        "type": "object"
+      },
       "GoalIn": {
         "additionalProperties": false,
         "properties": {
@@ -1328,6 +2181,101 @@
         "title": "GoalPatch",
         "type": "object"
       },
+      "GoalView": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "progress_days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Days Left"
+          },
+          "progress_expected_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Expected Pct"
+          },
+          "progress_pct": {
+            "title": "Progress Pct",
+            "type": "integer"
+          },
+          "progress_state": {
+            "description": "on_track, at_risk, overdue or no_deadline for active goals; otherwise the goal's own status",
+            "title": "Progress State",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "category",
+          "status",
+          "progress_pct",
+          "target_date",
+          "progress_state",
+          "progress_expected_pct",
+          "progress_days_left"
+        ],
+        "title": "GoalView",
+        "type": "object"
+      },
+      "GoalsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalView"
+            },
+            "title": "Goals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "goals"
+        ],
+        "title": "GoalsTool",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1339,6 +2287,75 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HabitDays": {
+        "additionalProperties": false,
+        "description": "Daily and weekday habits (`unit == \"days\"`).",
+        "properties": {
+          "cadence": {
+            "title": "Cadence",
+            "type": "string"
+          },
+          "completion_rate_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate 30D"
+          },
+          "current_streak": {
+            "title": "Current Streak",
+            "type": "integer"
+          },
+          "done_today": {
+            "title": "Done Today",
+            "type": "boolean"
+          },
+          "due_today": {
+            "title": "Due Today",
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "longest_streak": {
+            "title": "Longest Streak",
+            "type": "integer"
+          },
+          "target_per_week": {
+            "title": "Target Per Week",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "const": "days",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "cadence",
+          "target_per_week",
+          "current_streak",
+          "longest_streak",
+          "unit",
+          "done_today",
+          "due_today",
+          "completion_rate_30d"
+        ],
+        "title": "HabitDays",
         "type": "object"
       },
       "HabitIn": {
@@ -1408,6 +2425,119 @@
           }
         },
         "title": "HabitLogIn",
+        "type": "object"
+      },
+      "HabitOpen": {
+        "additionalProperties": false,
+        "properties": {
+          "current_streak": {
+            "title": "Current Streak",
+            "type": "integer"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "current_streak"
+        ],
+        "title": "HabitOpen",
+        "type": "object"
+      },
+      "HabitWeeks": {
+        "additionalProperties": false,
+        "description": "Weekly habits (`unit == \"weeks\"`): no `longest_streak` or `due_today`.",
+        "properties": {
+          "cadence": {
+            "title": "Cadence",
+            "type": "string"
+          },
+          "completion_rate_30d": {
+            "title": "Completion Rate 30D",
+            "type": "null"
+          },
+          "current_streak": {
+            "title": "Current Streak",
+            "type": "integer"
+          },
+          "done_today": {
+            "title": "Done Today",
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "target_per_week": {
+            "title": "Target Per Week",
+            "type": "integer"
+          },
+          "this_week": {
+            "title": "This Week",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "const": "weeks",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "cadence",
+          "target_per_week",
+          "current_streak",
+          "unit",
+          "this_week",
+          "done_today",
+          "completion_rate_30d"
+        ],
+        "title": "HabitWeeks",
+        "type": "object"
+      },
+      "HabitsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "habits": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "days": "#/components/schemas/HabitDays",
+                  "weeks": "#/components/schemas/HabitWeeks"
+                },
+                "propertyName": "unit"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/HabitDays"
+                },
+                {
+                  "$ref": "#/components/schemas/HabitWeeks"
+                }
+              ]
+            },
+            "title": "Habits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "habits"
+        ],
+        "title": "HabitsTool",
         "type": "object"
       },
       "IcsIn": {
@@ -1610,6 +2740,73 @@
         "title": "IngestIn",
         "type": "object"
       },
+      "InsightOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "top_category, spending_exceeds_income, low_savings_rate, category_increase, budget_exceeded, budget_near_limit, unusually_large_expense, upcoming_due. Open set.",
+            "title": "Code",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Figures behind `text`; keys depend on `code`. Money values are strings.",
+            "title": "Params",
+            "type": "object"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "alert"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "text": {
+            "description": "Fixed template filled with computed numbers; safe to display",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "params",
+          "text"
+        ],
+        "title": "InsightOut",
+        "type": "object"
+      },
+      "InsightsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/InsightOut"
+            },
+            "title": "Insights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "insights"
+        ],
+        "title": "InsightsTool",
+        "type": "object"
+      },
       "KillSwitchOut": {
         "properties": {
           "activated_at": {
@@ -1755,6 +2952,125 @@
           "start_date"
         ],
         "title": "LoanIn",
+        "type": "object"
+      },
+      "LoanRow": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate_pct": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Annual Rate Pct",
+            "type": "string"
+          },
+          "emi": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Emi",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "installments_paid_per_schedule": {
+            "title": "Installments Paid Per Schedule",
+            "type": "integer"
+          },
+          "installments_total": {
+            "title": "Installments Total",
+            "type": "integer"
+          },
+          "interest_paid_per_schedule": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Interest Paid Per Schedule",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "next_due": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due"
+          },
+          "next_emi": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Emi"
+          },
+          "outstanding_principal": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Outstanding Principal",
+            "type": "string"
+          },
+          "principal": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Principal",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tenor_months": {
+            "title": "Tenor Months",
+            "type": "integer"
+          },
+          "total_interest": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Total Interest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "principal",
+          "annual_rate_pct",
+          "tenor_months",
+          "emi",
+          "status",
+          "installments_total",
+          "installments_paid_per_schedule",
+          "outstanding_principal",
+          "interest_paid_per_schedule",
+          "total_interest",
+          "next_due",
+          "next_emi"
+        ],
+        "title": "LoanRow",
+        "type": "object"
+      },
+      "LoansTool": {
+        "additionalProperties": false,
+        "properties": {
+          "loans": {
+            "items": {
+              "$ref": "#/components/schemas/LoanRow"
+            },
+            "title": "Loans",
+            "type": "array"
+          }
+        },
+        "required": [
+          "loans"
+        ],
+        "title": "LoansTool",
         "type": "object"
       },
       "MemoryCreate": {
@@ -2117,6 +3433,85 @@
         "title": "MemoryUpdate",
         "type": "object"
       },
+      "MessagingSummaryTool": {
+        "additionalProperties": false,
+        "description": "The internal `memory_proposal` offer is stripped by the orchestrator before it reaches `data`.",
+        "properties": {
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "MessagingSummaryTool",
+        "type": "object"
+      },
+      "MoodTrend": {
+        "additionalProperties": false,
+        "properties": {
+          "avg_energy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Energy"
+          },
+          "avg_mood": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Mood"
+          },
+          "checkins": {
+            "title": "Checkins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checkins",
+          "avg_mood",
+          "avg_energy"
+        ],
+        "title": "MoodTrend",
+        "type": "object"
+      },
+      "MyStyle": {
+        "additionalProperties": false,
+        "properties": {
+          "avg_words": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Words"
+          },
+          "uses_emoji": {
+            "title": "Uses Emoji",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "avg_words",
+          "uses_emoji"
+        ],
+        "title": "MyStyle",
+        "type": "object"
+      },
       "OrchestratorResponse": {
         "properties": {
           "agent_id": {
@@ -2158,13 +3553,13 @@
           "data": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/ToolResults"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Deterministic results from the user's own records, keyed by tool name (money as strings).",
             "title": "Data"
           },
           "error": {
@@ -2303,6 +3698,181 @@
         "title": "OrchestratorResponse",
         "type": "object"
       },
+      "PendingTool": {
+        "additionalProperties": false,
+        "properties": {
+          "pending_review": {
+            "title": "Pending Review",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending_review"
+        ],
+        "title": "PendingTool",
+        "type": "object"
+      },
+      "PlanTool": {
+        "additionalProperties": false,
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockOut"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Date",
+            "type": "string"
+          },
+          "deferred": {
+            "items": {
+              "$ref": "#/components/schemas/UnscheduledOut"
+            },
+            "title": "Deferred",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "free_minutes": {
+            "title": "Free Minutes",
+            "type": "integer"
+          },
+          "overloaded": {
+            "title": "Overloaded",
+            "type": "boolean"
+          },
+          "planned_minutes": {
+            "title": "Planned Minutes",
+            "type": "integer"
+          },
+          "unscheduled": {
+            "items": {
+              "$ref": "#/components/schemas/UnscheduledOut"
+            },
+            "title": "Unscheduled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "events",
+          "blocks",
+          "unscheduled",
+          "deferred",
+          "free_minutes",
+          "planned_minutes",
+          "overloaded"
+        ],
+        "title": "PlanTool",
+        "type": "object"
+      },
+      "ProgressGoal": {
+        "additionalProperties": false,
+        "properties": {
+          "progress_pct": {
+            "title": "Progress Pct",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "progress_pct",
+          "state"
+        ],
+        "title": "ProgressGoal",
+        "type": "object"
+      },
+      "ProgressHabit": {
+        "additionalProperties": false,
+        "properties": {
+          "completion_rate_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate 30D"
+          },
+          "current_streak": {
+            "title": "Current Streak",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "current_streak",
+          "completion_rate_30d"
+        ],
+        "title": "ProgressHabit",
+        "type": "object"
+      },
+      "ProgressTool": {
+        "additionalProperties": false,
+        "properties": {
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressGoal"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "habits": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressHabit"
+            },
+            "title": "Habits",
+            "type": "array"
+          },
+          "mood_trend": {
+            "$ref": "#/components/schemas/MoodTrend"
+          },
+          "tasks_completed": {
+            "title": "Tasks Completed",
+            "type": "integer"
+          },
+          "tasks_open": {
+            "title": "Tasks Open",
+            "type": "integer"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_days",
+          "tasks_completed",
+          "tasks_open",
+          "habits",
+          "goals",
+          "mood_trend"
+        ],
+        "title": "ProgressTool",
+        "type": "object"
+      },
       "Readiness": {
         "properties": {
           "checks": {
@@ -2409,6 +3979,112 @@
           "remind_at"
         ],
         "title": "ReminderIn",
+        "type": "object"
+      },
+      "ReminderOut": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "remind_at": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "Remind At",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "remind_at",
+          "event_id",
+          "task_id"
+        ],
+        "title": "ReminderOut",
+        "type": "object"
+      },
+      "ReviewTool": {
+        "additionalProperties": false,
+        "properties": {
+          "carry_over": {
+            "items": {
+              "$ref": "#/components/schemas/CarryOver"
+            },
+            "title": "Carry Over",
+            "type": "array"
+          },
+          "date": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Date",
+            "type": "string"
+          },
+          "habits_done": {
+            "title": "Habits Done",
+            "type": "integer"
+          },
+          "habits_due": {
+            "title": "Habits Due",
+            "type": "integer"
+          },
+          "mood_trend": {
+            "$ref": "#/components/schemas/MoodTrend"
+          },
+          "streaks": {
+            "items": {
+              "$ref": "#/components/schemas/StreakRow"
+            },
+            "title": "Streaks",
+            "type": "array"
+          },
+          "tasks_completed_today": {
+            "title": "Tasks Completed Today",
+            "type": "integer"
+          },
+          "tomorrow": {
+            "$ref": "#/components/schemas/Tomorrow"
+          }
+        },
+        "required": [
+          "date",
+          "tasks_completed_today",
+          "carry_over",
+          "habits_done",
+          "habits_due",
+          "streaks",
+          "mood_trend",
+          "tomorrow"
+        ],
+        "title": "ReviewTool",
         "type": "object"
       },
       "RunDetail": {
@@ -2545,6 +4221,51 @@
           "response_available"
         ],
         "title": "RunDetail",
+        "type": "object"
+      },
+      "RunFailedEnvelope": {
+        "additionalProperties": false,
+        "description": "A governed run that ended without a usable answer: carries ids so the run can be found in history.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "error",
+          "run_id",
+          "execution_id",
+          "trace_id"
+        ],
+        "title": "RunFailedEnvelope",
         "type": "object"
       },
       "RunRequest": {
@@ -2934,6 +4655,56 @@
         "title": "StatusOut",
         "type": "object"
       },
+      "StreakRow": {
+        "additionalProperties": false,
+        "properties": {
+          "current_streak": {
+            "title": "Current Streak",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "current_streak"
+        ],
+        "title": "StreakRow",
+        "type": "object"
+      },
+      "SubscriptionActive": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "next_due": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Next Due",
+            "type": "string"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "amount",
+          "period",
+          "next_due"
+        ],
+        "title": "SubscriptionActive",
+        "type": "object"
+      },
       "SubscriptionIn": {
         "additionalProperties": false,
         "properties": {
@@ -2978,6 +4749,129 @@
           "next_due"
         ],
         "title": "SubscriptionIn",
+        "type": "object"
+      },
+      "SubscriptionSuggested": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "next_due": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Next Due",
+            "type": "string"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "period",
+          "next_due",
+          "occurrences"
+        ],
+        "title": "SubscriptionSuggested",
+        "type": "object"
+      },
+      "SubscriptionsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionActive"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "suggested": {
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionSuggested"
+            },
+            "title": "Suggested",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "suggested"
+        ],
+        "title": "SubscriptionsTool",
+        "type": "object"
+      },
+      "SuggestionsTool": {
+        "additionalProperties": false,
+        "properties": {
+          "caution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caution"
+          },
+          "conversation_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "draft_only": {
+            "const": true,
+            "title": "Draft Only",
+            "type": "boolean"
+          },
+          "drafts": {
+            "items": {
+              "$ref": "#/components/schemas/DraftOut"
+            },
+            "title": "Drafts",
+            "type": "array"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "needs_reply": {
+            "title": "Needs Reply",
+            "type": "boolean"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "send_supported": {
+            "const": false,
+            "title": "Send Supported",
+            "type": "boolean"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "intent",
+          "tone",
+          "drafts",
+          "caution",
+          "needs_reply",
+          "draft_only",
+          "send_supported",
+          "note",
+          "conversation_id"
+        ],
+        "title": "SuggestionsTool",
         "type": "object"
       },
       "TaskIn": {
@@ -3098,6 +4992,45 @@
         "title": "TaskPatch",
         "type": "object"
       },
+      "TheirTone": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "title": "Brief",
+            "type": "boolean"
+          },
+          "formal": {
+            "title": "Formal",
+            "type": "boolean"
+          },
+          "sentiment": {
+            "enum": [
+              "positive",
+              "negative",
+              "neutral"
+            ],
+            "title": "Sentiment",
+            "type": "string"
+          },
+          "urgent": {
+            "title": "Urgent",
+            "type": "boolean"
+          },
+          "uses_emoji": {
+            "title": "Uses Emoji",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sentiment",
+          "urgent",
+          "formal",
+          "uses_emoji",
+          "brief"
+        ],
+        "title": "TheirTone",
+        "type": "object"
+      },
       "ThreadOut": {
         "properties": {
           "agent_id": {
@@ -3166,6 +5099,361 @@
           "session_id"
         ],
         "title": "TokenResponse",
+        "type": "object"
+      },
+      "Tomorrow": {
+        "additionalProperties": false,
+        "properties": {
+          "first_events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "First Events",
+            "type": "array"
+          },
+          "top_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TopTask"
+            },
+            "title": "Top Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "first_events",
+          "top_tasks"
+        ],
+        "title": "Tomorrow",
+        "type": "object"
+      },
+      "ToolError": {
+        "additionalProperties": false,
+        "description": "A tool that could not produce data: messaging `not_found` / `not_shared` / `no_shared_conversation`, or\n`result_too_large` (then the response also carries the warning `tool_data_truncated`).",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ToolError",
+        "type": "object"
+      },
+      "ToolResults": {
+        "additionalProperties": false,
+        "properties": {
+          "coach.briefing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachBriefing"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.briefing` (absent if it did not run)",
+            "title": "Coach.Briefing"
+          },
+          "coach.goals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.goals` (absent if it did not run)",
+            "title": "Coach.Goals"
+          },
+          "coach.habits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HabitsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.habits` (absent if it did not run)",
+            "title": "Coach.Habits"
+          },
+          "coach.plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.plan` (absent if it did not run)",
+            "title": "Coach.Plan"
+          },
+          "coach.progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.progress` (absent if it did not run)",
+            "title": "Coach.Progress"
+          },
+          "coach.review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `coach.review` (absent if it did not run)",
+            "title": "Coach.Review"
+          },
+          "finance.budget_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.budget_status` (absent if it did not run)",
+            "title": "Finance.Budget Status"
+          },
+          "finance.cards": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.cards` (absent if it did not run)",
+            "title": "Finance.Cards"
+          },
+          "finance.cashflow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CashflowTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.cashflow` (absent if it did not run)",
+            "title": "Finance.Cashflow"
+          },
+          "finance.insights": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsightsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.insights` (absent if it did not run)",
+            "title": "Finance.Insights"
+          },
+          "finance.loans": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoansTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.loans` (absent if it did not run)",
+            "title": "Finance.Loans"
+          },
+          "finance.pending_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.pending_count` (absent if it did not run)",
+            "title": "Finance.Pending Count"
+          },
+          "finance.subscriptions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.subscriptions` (absent if it did not run)",
+            "title": "Finance.Subscriptions"
+          },
+          "finance.summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinanceSummary"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.summary` (absent if it did not run)",
+            "title": "Finance.Summary"
+          },
+          "finance.upcoming": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpcomingTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `finance.upcoming` (absent if it did not run)",
+            "title": "Finance.Upcoming"
+          },
+          "messaging.analyse": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyseTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `messaging.analyse` (absent if it did not run)",
+            "title": "Messaging.Analyse"
+          },
+          "messaging.reply_suggestions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionsTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `messaging.reply_suggestions` (absent if it did not run)",
+            "title": "Messaging.Reply Suggestions"
+          },
+          "messaging.summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessagingSummaryTool"
+              },
+              {
+                "$ref": "#/components/schemas/ToolError"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Result of tool `messaging.summary` (absent if it did not run)",
+            "title": "Messaging.Summary"
+          }
+        },
+        "title": "ToolResults",
+        "type": "object"
+      },
+      "TopTask": {
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([+-]\\d{2}:\\d{2}|Z)$",
+            "title": "Start",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "start"
+        ],
+        "title": "TopTask",
         "type": "object"
       },
       "TxnIn": {
@@ -3240,6 +5528,92 @@
           "description"
         ],
         "title": "TxnIn",
+        "type": "object"
+      },
+      "UnscheduledOut": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "no_free_window",
+              "beyond_daily_limit"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "task_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Task Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "score",
+          "reason",
+          "title"
+        ],
+        "title": "UnscheduledOut",
+        "type": "object"
+      },
+      "UpcomingItem": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "due": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "title": "Due",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "subscription",
+              "emi"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "amount",
+          "due"
+        ],
+        "title": "UpcomingItem",
+        "type": "object"
+      },
+      "UpcomingTool": {
+        "additionalProperties": false,
+        "properties": {
+          "upcoming": {
+            "items": {
+              "$ref": "#/components/schemas/UpcomingItem"
+            },
+            "title": "Upcoming",
+            "type": "array"
+          }
+        },
+        "required": [
+          "upcoming"
+        ],
+        "title": "UpcomingTool",
         "type": "object"
       },
       "Usage": {
@@ -4103,11 +6477,42 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/CoachBriefing",
                   "title": "Response Briefing V1 Coach Briefing Get"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Kill switch or service unavailable (error envelope or `detail`)."
           }
         },
         "security": [
@@ -5893,11 +8298,25 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Insights V1 Finance Insights Get"
+                  "items": {
+                    "$ref": "#/components/schemas/InsightOut"
+                  },
+                  "title": "Response 200 Insights V1 Finance Insights Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer)."
           },
           "422": {
             "content": {
@@ -5908,6 +8327,26 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Kill switch or service unavailable (error envelope or `detail`)."
           }
         },
         "security": [
@@ -6241,11 +8680,22 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/FinanceSummary",
                   "title": "Response Summary V1 Finance Summary Get"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer)."
           },
           "422": {
             "content": {
@@ -6256,6 +8706,26 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Kill switch or service unavailable (error envelope or `detail`)."
           }
         },
         "security": [
@@ -6763,11 +9233,25 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Upcoming V1 Finance Upcoming Get"
+                  "items": {
+                    "$ref": "#/components/schemas/UpcomingItem"
+                  },
+                  "title": "Response 200 Upcoming V1 Finance Upcoming Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer)."
           },
           "422": {
             "content": {
@@ -6778,6 +9262,26 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Kill switch or service unavailable (error envelope or `detail`)."
           }
         },
         "security": [
@@ -8399,15 +10903,143 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailEnvelope"
+                }
+              }
+            },
+            "description": "Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RunFailedEnvelope"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Refused by governance or permissions (error envelope)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Idempotency-Key reused with a different request, or still running (error envelope)."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (FastAPI) or `invalid_request` (error envelope)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DetailEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RunFailedEnvelope"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RunFailedEnvelope"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Internal error (error envelope)."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunFailedEnvelope"
+                }
+              }
+            },
+            "description": "The model output was malformed or the provider failed (`malformed_output`, `provider_error`; run-failed envelope)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RunFailedEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DetailEnvelope"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Kill switch or service unavailable (error envelope or `detail`)."
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RunFailedEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Run timeout (error envelope)."
           }
         },
         "security": [

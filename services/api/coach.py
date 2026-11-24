@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from database.schemas import CoachEvent, CoachGoal, CoachHabit, CoachTask
 from domain.coach.service import CoachError, CoachService
 from services.api.auth.deps import PrincipalDep, SessionDep
+from services.api.contracts.coach import CoachBriefing
 from services.api.domain_deps import CipherDep, decode_b64, jsonable
 
 router = APIRouter(prefix="/v1/coach", tags=["coach"])
@@ -418,7 +419,7 @@ async def plan(
     return await _run(session, go)
 
 
-@router.get("/briefing")
+@router.get("/briefing", responses={200: {"model": CoachBriefing}})
 async def briefing(p: PrincipalDep, session: SessionDep, cipher: CipherDep) -> Any:
     s = _svc(session, cipher)
 

@@ -24,6 +24,7 @@ from services.api import (
 )
 from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
+from services.api.contracts import openapi as contracts_openapi
 from services.api.db import create_engine, create_sessionmaker
 from services.api.middleware import (
     BodySizeLimitMiddleware,
@@ -96,6 +97,9 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     app.include_router(finance.router)
     app.include_router(messaging.router)
     app.include_router(coach.router)
+    contracts_openapi.install(
+        app
+    )  # B3: documentation-only schema refinement; no effect on requests
 
     # Added last = outermost: hardening headers wrap everything, then size limit, then rate limit.
     app.add_middleware(

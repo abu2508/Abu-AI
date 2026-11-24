@@ -15,6 +15,7 @@ from domain.finance.normalize import CATEGORIES
 from domain.finance.service import FinanceError, FinanceService, Outcome
 from domain.finance.types import RawTxn
 from services.api.auth.deps import PrincipalDep, SessionDep
+from services.api.contracts.finance import FinanceSummary, InsightOut, UpcomingItem
 from services.api.domain_deps import CipherDep, decode_b64, jsonable
 
 router = APIRouter(prefix="/v1/finance", tags=["finance"])
@@ -507,7 +508,7 @@ def _ym(s: FinanceService, year: int | None, month: int | None) -> tuple[int, in
     return year or t.year, month or t.month
 
 
-@router.get("/summary")
+@router.get("/summary", responses={200: {"model": FinanceSummary}})
 async def summary(
     principal: PrincipalDep,
     session: SessionDep,
@@ -536,7 +537,7 @@ async def cards(principal: PrincipalDep, session: SessionDep, cipher: CipherDep)
     return _json(await FinanceService(session, cipher).card_report(principal.user_id))
 
 
-@router.get("/insights")
+@router.get("/insights", responses={200: {"model": list[InsightOut]}})
 async def insights(
     principal: PrincipalDep,
     session: SessionDep,
@@ -559,7 +560,7 @@ async def insights(
     )
 
 
-@router.get("/upcoming")
+@router.get("/upcoming", responses={200: {"model": list[UpcomingItem]}})
 async def upcoming(
     principal: PrincipalDep,
     session: SessionDep,

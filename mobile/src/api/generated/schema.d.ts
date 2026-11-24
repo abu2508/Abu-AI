@@ -1607,6 +1607,81 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * AnalyseTool
+         * @description `message_count: 0` (empty conversation) carries only the four required keys; the rest are optional.
+         *     The two median keys exist only when the conversation has reliable timestamps.
+         */
+        AnalyseTool: {
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * First Message At
+             * @default null
+             */
+            first_message_at: string | null;
+            /**
+             * From Me
+             * @default null
+             */
+            from_me: number | null;
+            /**
+             * From Them
+             * @default null
+             */
+            from_them: number | null;
+            /** Instruction Like Messages */
+            instruction_like_messages: number;
+            /**
+             * Last Message At
+             * @default null
+             */
+            last_message_at: string | null;
+            /**
+             * Last Message Intent
+             * @default null
+             */
+            last_message_intent: string | null;
+            /**
+             * Last Sender
+             * @default null
+             */
+            last_sender: ("me" | "them") | null;
+            /**
+             * Median My Response Minutes
+             * @default null
+             */
+            median_my_response_minutes: number | null;
+            /**
+             * Median Their Response Minutes
+             * @default null
+             */
+            median_their_response_minutes: number | null;
+            /** Message Count */
+            message_count: number;
+            /** @default null */
+            my_style: components["schemas"]["MyStyle"] | null;
+            /**
+             * Needs Reply
+             * @default null
+             */
+            needs_reply: boolean | null;
+            /** Platform */
+            platform: string;
+            /** @default null */
+            their_tone: components["schemas"]["TheirTone"] | null;
+            /**
+             * Topics
+             * @description Up to 5 words derived from the other person's messages
+             * @default null
+             */
+            topics: string[] | null;
+            /**
+             * Waiting Hours
+             * @default null
+             */
+            waiting_hours: number | null;
+        };
         /** AppendIn */
         AppendIn: {
             /**
@@ -1653,12 +1728,67 @@ export interface components {
             /** Subject Type */
             subject_type: string;
         };
+        /** BlockOut */
+        BlockOut: {
+            /** End */
+            end: string;
+            /** Score */
+            score: number;
+            /** Start */
+            start: string;
+            /** Task Id */
+            task_id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * BriefingPlan
+         * @description The briefing's plan: unlike `coach.plan` it has no `deferred` list.
+         */
+        BriefingPlan: {
+            /** Blocks */
+            blocks: components["schemas"]["BlockOut"][];
+            /** Free Minutes */
+            free_minutes: number;
+            /** Overloaded */
+            overloaded: boolean;
+            /** Planned Minutes */
+            planned_minutes: number;
+            /** Unscheduled */
+            unscheduled: components["schemas"]["UnscheduledOut"][];
+        };
         /** BudgetIn */
         BudgetIn: {
             /** Category */
             category: string;
             /** Monthly Limit */
             monthly_limit: number | string;
+        };
+        /** BudgetRow */
+        BudgetRow: {
+            /**
+             * Category
+             * @description "*" is the total-spending budget
+             */
+            category: string;
+            /** Limit */
+            limit: string;
+            /** Pct */
+            pct: string;
+            /** Remaining */
+            remaining: string;
+            /** Spent */
+            spent: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "over";
+        };
+        /** BudgetsTool */
+        BudgetsTool: {
+            /** Budgets */
+            budgets: components["schemas"]["BudgetRow"][];
         };
         /** CallOut */
         CallOut: {
@@ -1710,6 +1840,58 @@ export interface components {
             /** Usd Inr Rate */
             usd_inr_rate: string | null;
         };
+        /** CardRow */
+        CardRow: {
+            /** Account Id */
+            account_id: string;
+            /** Band */
+            band: ("healthy" | "elevated" | "high") | null;
+            /** Label */
+            label: string;
+            /** Limit */
+            limit: string | null;
+            /** Owed */
+            owed: string;
+            /** Utilisation Pct */
+            utilisation_pct: string | null;
+        };
+        /** CardsTool */
+        CardsTool: {
+            /** Cards */
+            cards: components["schemas"]["CardRow"][];
+        };
+        /** CarryOver */
+        CarryOver: {
+            /** Due Date */
+            due_date: string | null;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** CashflowDay */
+        CashflowDay: {
+            /** Balance */
+            balance: string;
+            /** Date */
+            date: string;
+            /** Net */
+            net: string;
+        };
+        /** CashflowTool */
+        CashflowTool: {
+            /** Closing */
+            closing: string;
+            /**
+             * Projected Month Expense
+             * @description null unless the window starts on day 1 of the month
+             */
+            projected_month_expense: string | null;
+            /** Projection Note */
+            projection_note: string;
+            /** Series */
+            series: components["schemas"]["CashflowDay"][];
+        };
         /** CategoryIn */
         CategoryIn: {
             /** Category */
@@ -1733,6 +1915,26 @@ export interface components {
             mood: number;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * CoachBriefing
+         * @description GET /v1/coach/briefing and tool `coach.briefing` (identical).
+         */
+        CoachBriefing: {
+            /** Date */
+            date: string;
+            /** Events */
+            events: components["schemas"]["EventOut"][];
+            /** Goals Needing Attention */
+            goals_needing_attention: components["schemas"]["GoalAttention"][];
+            /** Habits Open */
+            habits_open: components["schemas"]["HabitOpen"][];
+            mood_trend: components["schemas"]["MoodTrend"];
+            plan: components["schemas"]["BriefingPlan"];
+            /** Reminders Due */
+            reminders_due: components["schemas"]["ReminderOut"][];
+            /** Streaks At Risk */
+            streaks_at_risk: string[];
         };
         /** ConfirmIn */
         ConfirmIn: {
@@ -1799,6 +2001,20 @@ export interface components {
             /** Tone Pref */
             tone_pref?: ("casual" | "warm" | "formal" | "brief") | null;
         };
+        /** DetailEnvelope */
+        DetailEnvelope: {
+            /** Detail */
+            detail: string;
+        };
+        /** DraftOut */
+        DraftOut: {
+            /** Option */
+            option: string;
+            /** Text */
+            text: string;
+            /** Tone */
+            tone: string;
+        };
         /** EnrollRequest */
         EnrollRequest: {
             /** Device Name */
@@ -1819,6 +2035,23 @@ export interface components {
              */
             confirm: "ERASE ALL MY MEMORY";
         };
+        /** ErrorBody */
+        ErrorBody: {
+            /**
+             * Code
+             * @description Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared.
+             */
+            code: string;
+            /**
+             * Message
+             * @description Safe, content-free text. Clients should show their own wording.
+             */
+            message: string;
+        };
+        /** ErrorEnvelope */
+        ErrorEnvelope: {
+            error: components["schemas"]["ErrorBody"];
+        };
         /** EventIn */
         EventIn: {
             /**
@@ -1837,6 +2070,23 @@ export interface components {
              * Start
              * Format: date-time
              */
+            start: string;
+            /** Title */
+            title: string;
+        };
+        /** EventOut */
+        EventOut: {
+            /** All Day */
+            all_day: boolean;
+            /** End */
+            end: string;
+            /** Id */
+            id: string;
+            /** Reminder Minutes */
+            reminder_minutes: number | null;
+            /** Source */
+            source: string;
+            /** Start */
             start: string;
             /** Title */
             title: string;
@@ -1917,6 +2167,56 @@ export interface components {
             /** Trace Id */
             trace_id: string;
         };
+        /**
+         * FinanceSummary
+         * @description GET /v1/finance/summary and tool `finance.summary` (identical).
+         */
+        FinanceSummary: {
+            /** End */
+            end: string;
+            /** Expense */
+            expense: string;
+            /**
+             * Expense By Category
+             * @description [category, amount] pairs, largest first; refunds can make an amount negative
+             */
+            expense_by_category: [
+                string,
+                string
+            ][];
+            /** Income */
+            income: string;
+            /** Income By Category */
+            income_by_category: [
+                string,
+                string
+            ][];
+            /** Net */
+            net: string;
+            /**
+             * Pending Review Count
+             * @description NOT included in the figures above
+             */
+            pending_review_count: number;
+            /**
+             * Savings Rate Pct
+             * @description null when income is 0
+             */
+            savings_rate_pct: string | null;
+            /** Start */
+            start: string;
+        };
+        /** GoalAttention */
+        GoalAttention: {
+            /** Days Left */
+            days_left: number | null;
+            /** Id */
+            id: string;
+            /** State */
+            state: string;
+            /** Title */
+            title: string;
+        };
         /** GoalIn */
         GoalIn: {
             /**
@@ -1943,10 +2243,68 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** GoalView */
+        GoalView: {
+            /** Category */
+            category: string;
+            /** Id */
+            id: string;
+            /** Progress Days Left */
+            progress_days_left: number | null;
+            /** Progress Expected Pct */
+            progress_expected_pct: number | null;
+            /** Progress Pct */
+            progress_pct: number;
+            /**
+             * Progress State
+             * @description on_track, at_risk, overdue or no_deadline for active goals; otherwise the goal's own status
+             */
+            progress_state: string;
+            /** Status */
+            status: string;
+            /** Target Date */
+            target_date: string | null;
+            /** Title */
+            title: string;
+        };
+        /** GoalsTool */
+        GoalsTool: {
+            /** Goals */
+            goals: components["schemas"]["GoalView"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HabitDays
+         * @description Daily and weekday habits (`unit == "days"`).
+         */
+        HabitDays: {
+            /** Cadence */
+            cadence: string;
+            /** Completion Rate 30D */
+            completion_rate_30d: number | null;
+            /** Current Streak */
+            current_streak: number;
+            /** Done Today */
+            done_today: boolean;
+            /** Due Today */
+            due_today: boolean;
+            /** Id */
+            id: string;
+            /** Longest Streak */
+            longest_streak: number;
+            /** Target Per Week */
+            target_per_week: number;
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            unit: "days";
         };
         /** HabitIn */
         HabitIn: {
@@ -1975,6 +2333,47 @@ export interface components {
              * @default true
              */
             done: boolean;
+        };
+        /** HabitOpen */
+        HabitOpen: {
+            /** Current Streak */
+            current_streak: number;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * HabitWeeks
+         * @description Weekly habits (`unit == "weeks"`): no `longest_streak` or `due_today`.
+         */
+        HabitWeeks: {
+            /** Cadence */
+            cadence: string;
+            /** Completion Rate 30D */
+            completion_rate_30d: null;
+            /** Current Streak */
+            current_streak: number;
+            /** Done Today */
+            done_today: boolean;
+            /** Id */
+            id: string;
+            /** Target Per Week */
+            target_per_week: number;
+            /** This Week */
+            this_week: number;
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            unit: "weeks";
+        };
+        /** HabitsTool */
+        HabitsTool: {
+            /** Habits */
+            habits: (components["schemas"]["HabitDays"] | components["schemas"]["HabitWeeks"])[];
         };
         /** IcsIn */
         IcsIn: {
@@ -2029,6 +2428,36 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** InsightOut */
+        InsightOut: {
+            /**
+             * Code
+             * @description top_category, spending_exceeds_income, low_savings_rate, category_increase, budget_exceeded, budget_near_limit, unusually_large_expense, upcoming_due. Open set.
+             */
+            code: string;
+            /**
+             * Params
+             * @description Figures behind `text`; keys depend on `code`. Money values are strings.
+             */
+            params: {
+                [key: string]: string | number | null;
+            };
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "alert";
+            /**
+             * Text
+             * @description Fixed template filled with computed numbers; safe to display
+             */
+            text: string;
+        };
+        /** InsightsTool */
+        InsightsTool: {
+            /** Insights */
+            insights: components["schemas"]["InsightOut"][];
+        };
         /** KillSwitchOut */
         KillSwitchOut: {
             /** Activated At */
@@ -2068,6 +2497,42 @@ export interface components {
             start_date: string;
             /** Tenor Months */
             tenor_months: number;
+        };
+        /** LoanRow */
+        LoanRow: {
+            /** Annual Rate Pct */
+            annual_rate_pct: string;
+            /** Emi */
+            emi: string;
+            /** Id */
+            id: string;
+            /** Installments Paid Per Schedule */
+            installments_paid_per_schedule: number;
+            /** Installments Total */
+            installments_total: number;
+            /** Interest Paid Per Schedule */
+            interest_paid_per_schedule: string;
+            /** Label */
+            label: string;
+            /** Next Due */
+            next_due: string | null;
+            /** Next Emi */
+            next_emi: string | null;
+            /** Outstanding Principal */
+            outstanding_principal: string;
+            /** Principal */
+            principal: string;
+            /** Status */
+            status: string;
+            /** Tenor Months */
+            tenor_months: number;
+            /** Total Interest */
+            total_interest: string;
+        };
+        /** LoansTool */
+        LoansTool: {
+            /** Loans */
+            loans: components["schemas"]["LoanRow"][];
         };
         /** MemoryCreate */
         MemoryCreate: {
@@ -2178,6 +2643,30 @@ export interface components {
             /** Text */
             text?: string | null;
         };
+        /**
+         * MessagingSummaryTool
+         * @description The internal `memory_proposal` offer is stripped by the orchestrator before it reaches `data`.
+         */
+        MessagingSummaryTool: {
+            /** Summary */
+            summary: string;
+        };
+        /** MoodTrend */
+        MoodTrend: {
+            /** Avg Energy */
+            avg_energy: number | null;
+            /** Avg Mood */
+            avg_mood: number | null;
+            /** Checkins */
+            checkins: number;
+        };
+        /** MyStyle */
+        MyStyle: {
+            /** Avg Words */
+            avg_words: number | null;
+            /** Uses Emoji */
+            uses_emoji: boolean;
+        };
         /** OrchestratorResponse */
         OrchestratorResponse: {
             /** Agent Id */
@@ -2187,10 +2676,11 @@ export interface components {
             /** Confidence */
             confidence?: number | null;
             context?: components["schemas"]["ContextInfo"];
-            /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
+            /**
+             * Data
+             * @description Deterministic results from the user's own records, keyed by tool name (money as strings).
+             */
+            data?: components["schemas"]["ToolResults"] | null;
             /** Error */
             error?: {
                 [key: string]: string;
@@ -2238,6 +2728,62 @@ export interface components {
             /** Workflow */
             workflow?: string | null;
         };
+        /** PendingTool */
+        PendingTool: {
+            /** Pending Review */
+            pending_review: number;
+        };
+        /** PlanTool */
+        PlanTool: {
+            /** Blocks */
+            blocks: components["schemas"]["BlockOut"][];
+            /** Date */
+            date: string;
+            /** Deferred */
+            deferred: components["schemas"]["UnscheduledOut"][];
+            /** Events */
+            events: components["schemas"]["EventOut"][];
+            /** Free Minutes */
+            free_minutes: number;
+            /** Overloaded */
+            overloaded: boolean;
+            /** Planned Minutes */
+            planned_minutes: number;
+            /** Unscheduled */
+            unscheduled: components["schemas"]["UnscheduledOut"][];
+        };
+        /** ProgressGoal */
+        ProgressGoal: {
+            /** Progress Pct */
+            progress_pct: number;
+            /** State */
+            state: string;
+            /** Title */
+            title: string;
+        };
+        /** ProgressHabit */
+        ProgressHabit: {
+            /** Completion Rate 30D */
+            completion_rate_30d: number | null;
+            /** Current Streak */
+            current_streak: number;
+            /** Title */
+            title: string;
+        };
+        /** ProgressTool */
+        ProgressTool: {
+            /** Goals */
+            goals: components["schemas"]["ProgressGoal"][];
+            /** Habits */
+            habits: components["schemas"]["ProgressHabit"][];
+            mood_trend: components["schemas"]["MoodTrend"];
+            /** Tasks Completed */
+            tasks_completed: number;
+            /** Tasks Open */
+            tasks_open: number;
+            /** Window Days */
+            window_days: number;
+        };
         /** Readiness */
         Readiness: {
             /** Checks */
@@ -2278,6 +2824,36 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ReminderOut */
+        ReminderOut: {
+            /** Event Id */
+            event_id: string | null;
+            /** Id */
+            id: string;
+            /** Remind At */
+            remind_at: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Text */
+            text: string;
+        };
+        /** ReviewTool */
+        ReviewTool: {
+            /** Carry Over */
+            carry_over: components["schemas"]["CarryOver"][];
+            /** Date */
+            date: string;
+            /** Habits Done */
+            habits_done: number;
+            /** Habits Due */
+            habits_due: number;
+            mood_trend: components["schemas"]["MoodTrend"];
+            /** Streaks */
+            streaks: components["schemas"]["StreakRow"][];
+            /** Tasks Completed Today */
+            tasks_completed_today: number;
+            tomorrow: components["schemas"]["Tomorrow"];
+        };
         /** RunDetail */
         RunDetail: {
             /** Agent Id */
@@ -2316,6 +2892,19 @@ export interface components {
             status: string;
             /** Workflow */
             workflow: string | null;
+        };
+        /**
+         * RunFailedEnvelope
+         * @description A governed run that ended without a usable answer: carries ids so the run can be found in history.
+         */
+        RunFailedEnvelope: {
+            error: components["schemas"]["ErrorBody"];
+            /** Execution Id */
+            execution_id: string | null;
+            /** Run Id */
+            run_id: string;
+            /** Trace Id */
+            trace_id: string | null;
         };
         /** RunRequest */
         RunRequest: {
@@ -2434,6 +3023,24 @@ export interface components {
             kill_switch: components["schemas"]["KillSwitchOut"];
             spending: components["schemas"]["SpendingOut"];
         };
+        /** StreakRow */
+        StreakRow: {
+            /** Current Streak */
+            current_streak: number;
+            /** Title */
+            title: string;
+        };
+        /** SubscriptionActive */
+        SubscriptionActive: {
+            /** Amount */
+            amount: string;
+            /** Label */
+            label: string;
+            /** Next Due */
+            next_due: string;
+            /** Period */
+            period: string;
+        };
         /** SubscriptionIn */
         SubscriptionIn: {
             /** Amount */
@@ -2450,6 +3057,51 @@ export interface components {
              * @enum {string}
              */
             period: "weekly" | "monthly" | "yearly";
+        };
+        /** SubscriptionSuggested */
+        SubscriptionSuggested: {
+            /** Amount */
+            amount: string;
+            /** Next Due */
+            next_due: string;
+            /** Occurrences */
+            occurrences: number;
+            /** Period */
+            period: string;
+        };
+        /** SubscriptionsTool */
+        SubscriptionsTool: {
+            /** Active */
+            active: components["schemas"]["SubscriptionActive"][];
+            /** Suggested */
+            suggested: components["schemas"]["SubscriptionSuggested"][];
+        };
+        /** SuggestionsTool */
+        SuggestionsTool: {
+            /** Caution */
+            caution: string | null;
+            /** Conversation Id */
+            conversation_id: string;
+            /**
+             * Draft Only
+             * @constant
+             */
+            draft_only: true;
+            /** Drafts */
+            drafts: components["schemas"]["DraftOut"][];
+            /** Intent */
+            intent: string;
+            /** Needs Reply */
+            needs_reply: boolean;
+            /** Note */
+            note: string;
+            /**
+             * Send Supported
+             * @constant
+             */
+            send_supported: false;
+            /** Tone */
+            tone: string;
         };
         /** TaskIn */
         TaskIn: {
@@ -2477,6 +3129,22 @@ export interface components {
             priority?: number | null;
             /** Title */
             title?: string | null;
+        };
+        /** TheirTone */
+        TheirTone: {
+            /** Brief */
+            brief: boolean;
+            /** Formal */
+            formal: boolean;
+            /**
+             * Sentiment
+             * @enum {string}
+             */
+            sentiment: "positive" | "negative" | "neutral";
+            /** Urgent */
+            urgent: boolean;
+            /** Uses Emoji */
+            uses_emoji: boolean;
         };
         /** ThreadOut */
         ThreadOut: {
@@ -2519,6 +3187,140 @@ export interface components {
              */
             token_type: string;
         };
+        /** Tomorrow */
+        Tomorrow: {
+            /** First Events */
+            first_events: components["schemas"]["EventOut"][];
+            /** Top Tasks */
+            top_tasks: components["schemas"]["TopTask"][];
+        };
+        /**
+         * ToolError
+         * @description A tool that could not produce data: messaging `not_found` / `not_shared` / `no_shared_conversation`, or
+         *     `result_too_large` (then the response also carries the warning `tool_data_truncated`).
+         */
+        ToolError: {
+            /** Error */
+            error: string;
+        };
+        /** ToolResults */
+        ToolResults: {
+            /**
+             * Coach.Briefing
+             * @description Result of tool `coach.briefing` (absent if it did not run)
+             * @default null
+             */
+            "coach.briefing": components["schemas"]["CoachBriefing"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Coach.Goals
+             * @description Result of tool `coach.goals` (absent if it did not run)
+             * @default null
+             */
+            "coach.goals": components["schemas"]["GoalsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Coach.Habits
+             * @description Result of tool `coach.habits` (absent if it did not run)
+             * @default null
+             */
+            "coach.habits": components["schemas"]["HabitsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Coach.Plan
+             * @description Result of tool `coach.plan` (absent if it did not run)
+             * @default null
+             */
+            "coach.plan": components["schemas"]["PlanTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Coach.Progress
+             * @description Result of tool `coach.progress` (absent if it did not run)
+             * @default null
+             */
+            "coach.progress": components["schemas"]["ProgressTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Coach.Review
+             * @description Result of tool `coach.review` (absent if it did not run)
+             * @default null
+             */
+            "coach.review": components["schemas"]["ReviewTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Budget Status
+             * @description Result of tool `finance.budget_status` (absent if it did not run)
+             * @default null
+             */
+            "finance.budget_status": components["schemas"]["BudgetsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Cards
+             * @description Result of tool `finance.cards` (absent if it did not run)
+             * @default null
+             */
+            "finance.cards": components["schemas"]["CardsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Cashflow
+             * @description Result of tool `finance.cashflow` (absent if it did not run)
+             * @default null
+             */
+            "finance.cashflow": components["schemas"]["CashflowTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Insights
+             * @description Result of tool `finance.insights` (absent if it did not run)
+             * @default null
+             */
+            "finance.insights": components["schemas"]["InsightsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Loans
+             * @description Result of tool `finance.loans` (absent if it did not run)
+             * @default null
+             */
+            "finance.loans": components["schemas"]["LoansTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Pending Count
+             * @description Result of tool `finance.pending_count` (absent if it did not run)
+             * @default null
+             */
+            "finance.pending_count": components["schemas"]["PendingTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Subscriptions
+             * @description Result of tool `finance.subscriptions` (absent if it did not run)
+             * @default null
+             */
+            "finance.subscriptions": components["schemas"]["SubscriptionsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Summary
+             * @description Result of tool `finance.summary` (absent if it did not run)
+             * @default null
+             */
+            "finance.summary": components["schemas"]["FinanceSummary"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Finance.Upcoming
+             * @description Result of tool `finance.upcoming` (absent if it did not run)
+             * @default null
+             */
+            "finance.upcoming": components["schemas"]["UpcomingTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Messaging.Analyse
+             * @description Result of tool `messaging.analyse` (absent if it did not run)
+             * @default null
+             */
+            "messaging.analyse": components["schemas"]["AnalyseTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Messaging.Reply Suggestions
+             * @description Result of tool `messaging.reply_suggestions` (absent if it did not run)
+             * @default null
+             */
+            "messaging.reply_suggestions": components["schemas"]["SuggestionsTool"] | components["schemas"]["ToolError"] | null;
+            /**
+             * Messaging.Summary
+             * @description Result of tool `messaging.summary` (absent if it did not run)
+             * @default null
+             */
+            "messaging.summary": components["schemas"]["MessagingSummaryTool"] | components["schemas"]["ToolError"] | null;
+        };
+        /** TopTask */
+        TopTask: {
+            /** Start */
+            start: string;
+            /** Title */
+            title: string;
+        };
         /** TxnIn */
         TxnIn: {
             /**
@@ -2544,6 +3346,39 @@ export interface components {
             direction: "debit" | "credit";
             /** Reference */
             reference?: string | null;
+        };
+        /** UnscheduledOut */
+        UnscheduledOut: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "no_free_window" | "beyond_daily_limit";
+            /** Score */
+            score: number;
+            /** Task Id */
+            task_id: string;
+            /** Title */
+            title: string;
+        };
+        /** UpcomingItem */
+        UpcomingItem: {
+            /** Amount */
+            amount: string;
+            /** Due */
+            due: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "subscription" | "emi";
+            /** Label */
+            label: string;
+        };
+        /** UpcomingTool */
+        UpcomingTool: {
+            /** Upcoming */
+            upcoming: components["schemas"]["UpcomingItem"][];
         };
         /** Usage */
         Usage: {
@@ -3042,7 +3877,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CoachBriefing"];
+                };
+            };
+            /** @description Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Kill switch or service unavailable (error envelope or `detail`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
         };
@@ -4170,7 +5032,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["InsightOut"][];
+                };
+            };
+            /** @description Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -4180,6 +5051,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Kill switch or service unavailable (error envelope or `detail`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
         };
@@ -4391,7 +5280,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceSummary"];
+                };
+            };
+            /** @description Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -4401,6 +5299,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Kill switch or service unavailable (error envelope or `detail`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
         };
@@ -4675,7 +5591,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UpcomingItem"][];
+                };
+            };
+            /** @description Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -4685,6 +5610,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Kill switch or service unavailable (error envelope or `detail`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
                 };
             };
         };
@@ -5694,13 +6637,85 @@ export interface operations {
                     "application/json": components["schemas"]["OrchestratorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Not authenticated or session ended (`detail` envelope, WWW-Authenticate: Bearer). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Refused by governance or permissions (error envelope). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"] | components["schemas"]["RunFailedEnvelope"];
+                };
+            };
+            /** @description Idempotency-Key reused with a different request, or still running (error envelope). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation error (FastAPI) or `invalid_request` (error envelope). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit (`detail` envelope + Retry-After) or spending/per-run limit (error envelope). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailEnvelope"] | components["schemas"]["ErrorEnvelope"] | components["schemas"]["RunFailedEnvelope"];
+                };
+            };
+            /** @description Internal error (error envelope). */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"] | components["schemas"]["RunFailedEnvelope"];
+                };
+            };
+            /** @description The model output was malformed or the provider failed (`malformed_output`, `provider_error`; run-failed envelope). */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunFailedEnvelope"];
+                };
+            };
+            /** @description Kill switch or service unavailable (error envelope or `detail`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"] | components["schemas"]["RunFailedEnvelope"] | components["schemas"]["DetailEnvelope"];
+                };
+            };
+            /** @description Run timeout (error envelope). */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunFailedEnvelope"] | components["schemas"]["ErrorEnvelope"];
                 };
             };
         };

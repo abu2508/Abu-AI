@@ -1,0 +1,47 @@
+name: backend-openapi
+
+# Fails when the committed OpenAPI snapshot (mobile/openapi/openapi.json) no longer matches what the backend would
+# export. Offline: no database, no network services, no secrets, no model calls.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'services/**'
+      - 'core/**'
+      - 'domain/**'
+      - 'agents/**'
+      - 'database/**'
+      - 'mobile/openapi/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/backend-openapi.yml'
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'services/**'
+      - 'core/**'
+      - 'domain/**'
+      - 'agents/**'
+      - 'database/**'
+      - 'mobile/openapi/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/backend-openapi.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  openapi-snapshot:
+    runs-on: ubuntu-latest
+    env:
+      CI: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - name: Install locked dependencies (no dev group)
+        run: uv sync --frozen --no-dev
+      - name: OpenAPI snapshot is current
+        run: uv run --no-sync python -m services.admin openapi check
