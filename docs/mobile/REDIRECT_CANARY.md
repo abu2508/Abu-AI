@@ -14,6 +14,13 @@
 The screen exists only in debug builds (Expo Go dev). Origin **A** answers `POST /redir/301`, `/redir/302`, `/redir/307`, `/redir/308` with a redirect to origin **B**. Origin **B** records anything it receives. A safe transport shows the redirect response and **B receives nothing**.
 
 ## Steps (Windows, PowerShell)
+0. **Before you start (SDK 58).**
+   - The app is on **Expo SDK 58.0.26** (upgrade report: `docs/mobile/reports/SDK58_UPGRADE.md`). The App Store's **Expo Go is the SDK 58 build**, which is the one that opens this app. Older Expo Go builds cannot be installed on iOS; if Expo Go says *"Project is incompatible with this version of Expo Go"*, one side is not on SDK 58: update Expo Go in the App Store, or check you are on the upgrade commit below.
+   - Use the branch and the commit named in the SDK 58 report (`git fetch origin claude/charming-davinci-vqv0du`, `git checkout claude/charming-davinci-vqv0du`, `git pull`, then `git log -1 --format=%H` must print the commit the report names). Do not modify any file.
+   - Use **Node 22.x exactly** (`node -v` must start with `v22.`; tested: 22.23.5). Node 24 and 26 are not the verified toolchain. Install with `npm ci`, never `npm audit fix`, `npm install` or `--force`.
+   - Windows PowerShell may block `npm`/`npx` scripts: run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once.
+   - If you have **not** yet run the optional Windows trace (`docs/mobile/SDK58_WINDOWS_TRACE.md`), do that first; it is read-only and tells us which Expo tooling runs on your PC.
+   - On the iPhone, allow **Local Network** access for Expo Go when iOS asks (Settings > Expo Go > Local Network if you declined).
 1. **Prerequisites.** Node 22 (`node -v`), the repository checked out, then:
    ```powershell
    cd <repo>\mobile
@@ -53,7 +60,9 @@ The screen exists only in debug builds (Expo Go dev). Origin **A** answers `POST
    ```
 
 ## Evidence to submit (for review; the gate stays false until you approve)
-- Device model, iOS version, Expo Go version, date and time.
+- Device model, iOS version, **Expo Go version and its SDK (must say SDK 58.0.0 or later in the same major line)**, date and time.
+- The commit SHA (`git log -1 --format=%H`), `node -v` and `npm -v` on the Windows PC, and the Windows version.
+- The result of `npm run check:overrides` and `npm run check:noxcturnal` on the PC (both must print `... guard OK`), to show the tested dependency tree was installed.
 - The phone screenshot (result + evidence JSON: `overall`, per-status `appSaw`, `secondOriginReceived`, `reachedFirstOrigin`, `transport.expoFetch` must be `true`, `rnFetchForced` must be `false`).
 - The Windows console output (`=== RESULT: ... ===` and any `B RECEIVED` lines).
 - Confirmation that the Wi-Fi profile was Private and the firewall rule was removed afterwards.
@@ -62,7 +71,7 @@ The screen exists only in debug builds (Expo Go dev). Origin **A** answers `POST
 1. `overall` is `PASS` and all four statuses (301, 302, 307, 308) are `PASS`; none is `INCONCLUSIVE`.
 2. `secondOriginReceived` is `false` everywhere; the console has no `B RECEIVED` line.
 3. `transport.expoFetch` is `true`, `rnFetchForced` is `false`; `platform` is `ios`.
-4. The same result on the OS version(s) you intend to support; re-run after any Expo SDK or `react-native` upgrade.
+4. The same result on the OS version(s) you intend to support; re-run after any Expo SDK or `react-native` upgrade. Evidence from SDK 57 (none exists) would not apply: a result is valid only for the SDK 58 build, Expo Go version and iOS version it was taken on.
 5. Only then, and only with an explicit approval, a reviewed commit flips `NATIVE_AUTH_TRANSPORT_VERIFIED` to `true` (and updates the tests that pin it).
 
 ## Safety rules (also enforced in code)
@@ -70,3 +79,5 @@ The screen exists only in debug builds (Expo Go dev). Origin **A** answers `POST
 - Fake credentials only; the app screen never reads a real token; it does not use the Abu AI runtime or the backend allowlist.
 - The screen is not present in release builds. The canary is temporary: remove the firewall rule when finished.
 - This does **not** clear any of the four production security gates.
+
+**Note on the source reading.** The expectation that `expo/fetch` refuses redirects on iOS and Android is from reading the Expo SDK source (SDK 57, re-read for SDK 58 in the upgrade report). It is not evidence; only this canary on the device is.
