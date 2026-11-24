@@ -280,6 +280,7 @@ async def seed_messaging(api: Api, dev: Device, **kw: object) -> dict[str, Any]:
 
 # (name, message) pairs: every workflow family; "{conv}" runs also pass conversation_id.
 FINANCE_RUNS = [
+    ("run.finance.overview", "Show my income and savings this month"),
     ("run.finance.budgets", "How is my budget this month?"),
     ("run.finance.budgets.october", "How is my budget doing in October 2026?"),
     ("run.finance.transactions", "Give me insights on my spending this month"),
