@@ -4,6 +4,8 @@ Generated in a scratch copy (repository files untouched) by resolving the SDK 58
 
 Versions below are the exact lockfile versions; where a package appears at more than one nested path every version is listed.
 
+> **Revision 3 note.** This diff is the preview **without overrides**. The recommended `overrides` of `SDK58_UPGRADE_PLAN.md` section 11.1.B change 7 package names in the `glob` subtree (`glob`, `minimatch`, `path-scurry`, `string-width`, `wrap-ansi`, `ansi-styles`, `emoji-regex`) and drop 9 packages (`@isaacs/cliui`, `jackspeak`, `foreground-child`, `package-json-from-dist`, `@pkgjs/parseargs`, `eastasianwidth`, `string-width-cjs`, `strip-ansi-cjs`, `wrap-ansi-cjs`); with them the audit count is 0 instead of 22.
+
 ## A. Direct dependencies
 See section 3.1 of `SDK58_UPGRADE_PLAN.md`.
 
