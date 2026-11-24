@@ -121,7 +121,10 @@ describe('API client: error mapping', () => {
     [429, 'rate_limited'],
     [503, 'service_unavailable'],
     [500, 'server'],
-    [502, 'server'],
+    [502, 'bad_gateway'],
+    [504, 'timeout'],
+    [409, 'conflict'],
+    [599, 'server'],
     [400, 'bad_request'],
     [422, 'bad_request'],
   ])('HTTP %i -> %s', async (status, code) => {

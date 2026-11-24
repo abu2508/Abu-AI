@@ -28,6 +28,7 @@ export function makeWorld(over: Partial<RuntimeDeps> = {}) {
       },
       random: () => 0.5,
       store: authStatusStore,
+      platform: 'web', // the native credential gate is tested explicitly in tests/auth/transport.test.ts
       ...over,
       ...extra,
     });

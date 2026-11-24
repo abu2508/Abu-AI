@@ -25,6 +25,12 @@ jest.mock('expo-secure-store', () => {
     __reset: () => store.clear(),
   };
 });
+// The one transport module imports expo/fetch (native). Tests inject their own transport; this one must never be used.
+jest.mock('expo/fetch', () => ({
+  fetch: () => {
+    throw new Error('expo/fetch must not be used in tests: inject a transport.');
+  },
+}));
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: () => Promise.resolve({ isConnected: true, isInternetReachable: true }),
   addNetworkStateListener: () => ({ remove: () => undefined }),

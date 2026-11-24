@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 
 import { ApiError, isApiError } from '@/api/errors';
 import { createHttp, type RequestSpec, type Transport } from '@/api/http';
+import { defaultTransport, isExpoFetchTransport } from '@/api/transport';
 import type { Logger } from '@/api/log';
 import {
   emptySchema,
@@ -15,6 +16,8 @@ import {
 } from '@/api/schemas';
 import { getApprovedBackends, IS_DEBUG_BUILD } from '@/config/approvedBackends';
 import type { ApprovedBackend } from '@/config/backendAllowlist';
+import { credentialsAllowed } from '@/config/transportGate';
+import { Platform } from 'react-native';
 import { createConnectivity, type Connectivity } from './connectivity';
 import { createCredentialVault, type CredentialVault } from './credentialVault';
 import { platformCrypto, type CryptoPort } from './crypto';
@@ -39,6 +42,9 @@ export interface RuntimeDeps {
   timeoutMs?: number;
   defaultDeviceName?: () => string;
   store?: typeof authStatusStore;
+  /** Test seams for the native credential gate (production uses Platform.OS and the committed constant). */
+  platform?: string;
+  nativeVerified?: boolean;
 }
 
 export type AuthedSpec<T> = Omit<RequestSpec<T>, 'bearer' | 'originOverride'> & { mutation?: boolean };
@@ -80,8 +86,13 @@ export function createAuthRuntime(deps: RuntimeDeps = {}) {
   let label: string | null = null;
   let userId: string | null = null;
 
-  const send = createHttp({
-    transport: deps.transport ?? ((u, i) => (globalThis as unknown as { fetch: typeof fetch }).fetch(u, i)),
+  const platform = deps.platform ?? Platform.OS;
+  const nativeVerified = deps.nativeVerified;
+  const transportAllowed = () =>
+    credentialsAllowed(platform, nativeVerified) &&
+    (deps.transport !== undefined || platform === 'web' || isExpoFetchTransport());
+  const rawSend = createHttp({
+    transport: deps.transport ?? defaultTransport,
     approved,
     debug,
     origin: () => origin,
@@ -91,6 +102,15 @@ export function createAuthRuntime(deps: RuntimeDeps = {}) {
     ...(deps.timeoutMs !== undefined ? { timeoutMs: deps.timeoutMs } : {}),
     ...(deps.log ? { log: deps.log } : {}),
   });
+
+  /**
+   * Every request this runtime makes carries a credential (enrollment code, refresh token or bearer token), so every
+   * request passes the native gate: while NATIVE_AUTH_TRANSPORT_VERIFIED is false nothing credentialed leaves a native device.
+   */
+  const send: typeof rawSend = (spec) => {
+    if (!transportAllowed()) return Promise.reject(new ApiError('blocked_transport'));
+    return rawSend(spec);
+  };
 
   /** Local wipe: memory, Keychain, query cache. Always runs to completion; returns whether the Keychain was cleared. */
   async function wipeLocal(): Promise<boolean> {
@@ -187,6 +207,10 @@ export function createAuthRuntime(deps: RuntimeDeps = {}) {
     },
     get userId() {
       return userId;
+    },
+    /** True on native while the transport has not been verified on a device (credentialed requests are refused). */
+    get nativeBlocked() {
+      return !transportAllowed();
     },
     get status(): AuthStatus {
       return store.getState().status;

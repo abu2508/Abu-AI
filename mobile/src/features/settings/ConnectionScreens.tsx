@@ -133,7 +133,14 @@ export function ConnectionScreen() {
         </>
       ) : null}
 
-      {conn.status === 'unenrolled' || conn.status === 'expired' ? (
+      {rt.nativeBlocked ? (
+        <Banner tone="warning" title="Connecting from this device is disabled">
+          This iPhone stays in synthetic demo mode: no enrollment code, token or request leaves the device until the
+          network transport has been verified on a physical device and that evidence has been reviewed.
+        </Banner>
+      ) : null}
+
+      {!rt.nativeBlocked && (conn.status === 'unenrolled' || conn.status === 'expired') ? (
         <>
           {conn.status === 'expired' ? (
             <Banner tone="warning" title="Session ended">

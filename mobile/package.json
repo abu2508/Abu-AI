@@ -17,7 +17,7 @@
     "check:install-scripts": "node scripts/check-install-scripts.mjs",
     "check:audit": "node scripts/audit-gate.mjs",
     "check:secrets": "node scripts/scan-secrets.mjs",
-    "check:all": "npm run check:sdk && npm run typecheck && npm run lint && npm run format:check && npm run test:coverage && npm run api:types:check && npm run check:licenses && npm run check:install-scripts && npm run check:audit && npm run check:secrets",
+    "check:all": "npm run check:sdk && npm run typecheck && npm run lint && npm run format:check && npm run test:coverage && npm run api:types:check && npm run check:licenses && npm run check:install-scripts && npm run check:audit && npm run check:transport && npm run check:secrets",
     "export:web": "expo export --platform web",
     "assets": "node scripts/generate-assets.mjs",
     "screenshots": "node scripts/screenshots.mjs",
@@ -25,7 +25,8 @@
     "test:coverage": "jest --coverage",
     "test:contract": "node --env-file=.contract.env node_modules/jest/bin/jest.js --config jest.contract.config.js",
     "contract:up": "bash scripts/contract-backend.sh up",
-    "contract:down": "bash scripts/contract-backend.sh down"
+    "contract:down": "bash scripts/contract-backend.sh down",
+    "check:transport": "node scripts/check-transport.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "57.0.19",

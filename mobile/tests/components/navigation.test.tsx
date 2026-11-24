@@ -69,10 +69,11 @@ describe('Settings navigation', () => {
     await waitFor(() => expect(screen.getByText(/following the system/)).toBeTruthy());
   });
 
-  it('About lists all four production gates as BLOCKED and the synthetic-data notice', async () => {
+  it('About lists all four production gates as BLOCKED plus the native transport gate, and the synthetic-data notice', async () => {
     await go('/settings/about');
     await screen.findByText('Synthetic data only');
-    expect(screen.getAllByText('BLOCKED')).toHaveLength(4);
+    expect(screen.getAllByText('BLOCKED')).toHaveLength(5); // four production gates + the device-verification gate (M8.2)
+    expect(screen.getByText('Native authenticated transport')).toBeTruthy();
   });
 
   it('later-milestone sections are explicit placeholders, not fake features', async () => {

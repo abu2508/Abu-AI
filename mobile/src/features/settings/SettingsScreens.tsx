@@ -14,6 +14,7 @@ import {
   Row,
 } from '@/design';
 import { GATES } from '@/config/gates';
+import { NATIVE_GATE_STATUS, NATIVE_GATE_TITLE } from '@/config/transportGate';
 import type { AppearancePreference } from '@/prefs/appearance';
 import { ConnectionScreen, SessionsScreen } from './ConnectionScreens';
 
@@ -98,8 +99,27 @@ export function AboutScreen() {
           </Row>
         ))}
       </Card>
+      <Text variant="title3">Device verification gate</Text>
+      <Card>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Text variant="callout" style={{ flex: 1 }}>
+            {NATIVE_GATE_TITLE}
+          </Text>
+          <Text
+            variant="footnote"
+            tone={NATIVE_GATE_STATUS() === 'BLOCKED' ? 'danger' : 'success'}
+            style={{ fontWeight: '700' }}
+          >
+            {NATIVE_GATE_STATUS()}
+          </Text>
+        </Row>
+        <Text variant="footnote" tone="secondary">
+          Until the redirect canary has been run on a physical device and reviewed, this iPhone sends no enrollment
+          code, refresh token or bearer token. Web testing is not affected.
+        </Text>
+      </Card>
       <Text variant="footnote" tone="secondary">
-        Version 0.1.0 (M8.1 authentication foundation)
+        Version 0.1.0 (M8.2 Home and Ask Abu)
       </Text>
     </Screen>
   );

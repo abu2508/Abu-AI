@@ -12,7 +12,12 @@ export type ApiErrorCode =
   | 'offline'
   | 'timeout'
   | 'contract'
-  | 'storage';
+  | 'storage'
+  | 'blocked_transport'
+  | 'kill_switch'
+  | 'limit_reached'
+  | 'conflict'
+  | 'bad_gateway';
 
 const MESSAGES: Record<ApiErrorCode, string> = {
   not_connected: 'Not connected to a development backend.',
@@ -29,6 +34,12 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   timeout: 'The server took too long to respond.',
   contract: 'The server sent an unexpected response, so it was discarded.',
   storage: 'Secure storage is unavailable or locked.',
+  blocked_transport:
+    'Connecting from this device is disabled until the network transport has been verified on a physical device.',
+  kill_switch: 'Abu AI is paused by the safety switch.',
+  limit_reached: 'A spending or per-request limit was reached.',
+  conflict: 'That request is already running or was already used. Check Recent asks.',
+  bad_gateway: 'Abu could not produce a valid answer. Try again.',
 };
 
 /** Fixed messages only: never the server body, a token, a code or a URL. */
@@ -36,12 +47,15 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly status?: number;
   readonly retryAfterSeconds?: number;
-  constructor(code: ApiErrorCode, extra: { status?: number; retryAfterSeconds?: number } = {}) {
+  /** The backend's stable `error.code`, only if it is on the known list (never free text). */
+  readonly serverCode?: string;
+  constructor(code: ApiErrorCode, extra: { status?: number; retryAfterSeconds?: number; serverCode?: string } = {}) {
     super(MESSAGES[code]);
     this.name = 'ApiError';
     this.code = code;
     if (extra.status !== undefined) this.status = extra.status;
     if (extra.retryAfterSeconds !== undefined) this.retryAfterSeconds = extra.retryAfterSeconds;
+    if (extra.serverCode !== undefined) this.serverCode = extra.serverCode;
   }
 }
 

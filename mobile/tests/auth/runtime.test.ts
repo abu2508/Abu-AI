@@ -468,11 +468,17 @@ describe('runtime singleton and defaults', () => {
     expect(b.approvedBackends()).toEqual([]); // shipped build approves nothing
     expect(b.status).toBe('unenrolled');
   });
-  it('the default transport is the global fetch, which Jest blocks (no network in tests)', async () => {
-    const rt = createAuthRuntime({
-      approved: () => [{ id: 'dev', label: 'Dev', origin: ORIGIN, kind: 'development' }],
+  it('on native the default runtime refuses every credentialed request (gate false); on web it reaches the transport module', async () => {
+    const approved = () => [{ id: 'dev', label: 'Dev', origin: ORIGIN, kind: 'development' as const }];
+    const native = createAuthRuntime({ approved });
+    expect(native.nativeBlocked).toBe(true);
+    await expect(native.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
+      code: 'blocked_transport',
     });
-    await expect(rt.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
+    const web = createAuthRuntime({ approved, platform: 'web' });
+    expect(web.nativeBlocked).toBe(false);
+    // the module's expo/fetch is mocked to throw in Jest: reaching it proves the explicit transport is the default
+    await expect(web.enroll({ backendId: 'dev', code: 'CODE-AAAA-1111', deviceName: 'x' })).rejects.toMatchObject({
       code: 'network',
     });
   });

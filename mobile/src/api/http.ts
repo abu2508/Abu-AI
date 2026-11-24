@@ -30,26 +30,82 @@ export interface RequestSpec<T> {
   body?: unknown;
   bearer?: string;
   headers?: Record<string, string>;
+  /** Query parameters: keys are lowercase identifiers, values are primitives; all are URL-encoded here. */
+  query?: Record<string, string | number | boolean>;
   /** Overrides the connected origin (enrollment targets the chosen approved backend before it is "connected"). */
   originOverride?: string;
 }
 
 const PATH = /^\/v1\/[A-Za-z0-9/_-]*$/;
 
-function mapStatus(status: number, res: Response): ApiError {
-  if (status === 401) return new ApiError('unauthorized', { status });
-  if (status === 403) return new ApiError('forbidden', { status });
-  if (status === 404) return new ApiError('not_found', { status });
+/** Backend `error.code` values the client recognises (open set on the server: anything else is ignored, never shown). */
+export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
+  'invalid_request',
+  'idempotency_conflict',
+  'request_in_progress',
+  'kill_switch_active',
+  'governance_unavailable',
+  'governance_refused',
+  'permission_denied',
+  'spending_blocked',
+  'limit_exceeded',
+  'model_unavailable',
+  'memory_unavailable',
+  'timeout',
+  'internal_error',
+  'malformed_output',
+  'provider_error',
+  'already_checked_in',
+  'already_imported',
+  'conversation_full',
+  'credit_limit_required',
+  'import_failed',
+  'invalid_category',
+  'invalid_channel',
+  'invalid_date',
+  'invalid_format',
+  'invalid_hours',
+  'invalid_loan',
+  'invalid_range',
+  'invalid_timezone',
+  'not_found',
+  'not_shared',
+]);
+
+/** The backend's `{"error":{"code"}}` code if it is on the known list. The message is NEVER read. */
+async function readServerCode(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { error?: { code?: unknown } } | null;
+    const code = body?.error?.code;
+    return typeof code === 'string' && KNOWN_ERROR_CODES.has(code) ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function mapStatus(status: number, res: Response): Promise<ApiError> {
+  const serverCode = await readServerCode(res);
+  const extra = { status, ...(serverCode ? { serverCode } : {}) };
+  if (status === 401) return new ApiError('unauthorized', extra);
+  if (status === 403) return new ApiError('forbidden', extra);
+  if (status === 404) return new ApiError('not_found', extra);
+  if (status === 409) return new ApiError('conflict', extra);
   if (status === 429) {
+    if (serverCode === 'spending_blocked' || serverCode === 'limit_exceeded')
+      return new ApiError('limit_reached', extra);
+    // The rate limiter answers {"detail": ...} with Retry-After (no error envelope).
     const ra = Number(res.headers.get('Retry-After'));
     return new ApiError('rate_limited', {
-      status,
+      ...extra,
       ...(Number.isFinite(ra) && ra > 0 ? { retryAfterSeconds: Math.min(ra, 60) } : {}),
     });
   }
-  if (status === 503) return new ApiError('service_unavailable', { status });
-  if (status >= 500) return new ApiError('server', { status });
-  return new ApiError('bad_request', { status });
+  if (status === 502) return new ApiError('bad_gateway', extra);
+  if (status === 503)
+    return new ApiError(serverCode === 'kill_switch_active' ? 'kill_switch' : 'service_unavailable', extra);
+  if (status === 504) return new ApiError('timeout', extra);
+  if (status >= 500) return new ApiError('server', extra);
+  return new ApiError('bad_request', extra);
 }
 
 export function createHttp(cfg: HttpConfig) {
@@ -63,7 +119,16 @@ export function createHttp(cfg: HttpConfig) {
     if (!isAllowedBackendUrl(origin, { debug: cfg.debug, approved: cfg.approved() }))
       throw new ApiError('blocked_origin');
     if (!PATH.test(spec.path)) throw new ApiError('blocked_origin');
-    const url = origin + spec.path;
+    let qs = '';
+    if (spec.query) {
+      const parts: string[] = [];
+      for (const [k, v] of Object.entries(spec.query)) {
+        if (!/^[a-z_]{1,32}$/.test(k)) throw new ApiError('bad_request');
+        parts.push(`${k}=${encodeURIComponent(String(v))}`);
+      }
+      qs = parts.length ? `?${parts.join('&')}` : '';
+    }
+    const url = origin + spec.path + qs;
     if (new URL(url).origin !== origin) throw new ApiError('blocked_origin');
 
     const headers: Record<string, string> = {
@@ -120,7 +185,7 @@ export function createHttp(cfg: HttpConfig) {
       }
     }
     if (!res.ok) {
-      const err = mapStatus(res.status, res);
+      const err = await mapStatus(res.status, res);
       log(res.status, err.code);
       throw err;
     }
