@@ -69,7 +69,7 @@ def _resolved(
     envfile.write_text(PLACEHOLDER_ENV + extra_env)
     cmd = ["docker", "compose", "--env-file", str(envfile)]
     if profile:
-        cmd += ["--profile", "admin"]
+        cmd += ["--profile", "admin", "--profile", "ops"]
     for f in LAYERS[env]:
         cmd += ["-f", f]
     cmd += ["config", "--format", "json"]
@@ -125,6 +125,9 @@ def test_caddyfile_hardening(name: str) -> None:
     for sensitive in ("Authorization", "Cookie", "Idempotency-Key"):
         assert f"request>headers>{sensitive} delete" in text, f"{name} logs {sensitive}"
     assert "request>remote_ip delete" in text
+    assert (
+        'request>uri regexp \\?.* ""' in text
+    )  # the query string can carry search text: the access log keeps the path only
     # Caddy must trust no upstream proxy, otherwise a client-supplied X-Forwarded-For could reach the API's rate limiter
     assert "trusted_proxies" not in re.sub(r"#.*", "", text)
 
@@ -261,6 +264,28 @@ def test_the_database_receives_the_owner_role_only_through_the_init_script_envir
     db = _resolved("staging", tmp_path)["services"]["db"]
     assert db["environment"]["APP_DB_OWNER_USER"] == "placeholder_owner"
     assert not db.get("ports")
+
+
+@needs_docker
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_the_ops_runner_is_opt_in_read_only_and_uses_the_runtime_role(
+    env: str, tmp_path: Path
+) -> None:
+    cfg = _resolved(env, tmp_path)
+    ops = cfg["services"]["ops"]
+    assert ops["profiles"] == ["ops"]  # never started by `up`
+    assert set(ops["networks"]) == {"data"} and not ops.get("ports")
+    assert set(ops["environment"]) == {"ABU_OPS_DATABASE_URL"}
+    assert "placeholder_owner" not in json.dumps(
+        ops["environment"]
+    )  # runtime role, never the owner
+    assert ops["read_only"] is True and "ALL" in ops["cap_drop"]
+    assert [v["source"] for v in ops["volumes"]][0].endswith("infrastructure/scripts") and ops[
+        "volumes"
+    ][0]["read_only"]
+    # and `up` starts nothing of it
+    no_profile = _resolved(env, tmp_path, profile=False)
+    assert "ops" not in no_profile["services"] and "admin" not in no_profile["services"]
 
 
 @needs_docker

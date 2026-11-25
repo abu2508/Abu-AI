@@ -39,7 +39,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 OK, WARN, CRIT = "OK", "WARN", "CRIT"
 RANK = {OK: 0, WARN: 1, CRIT: 2}
-REPO = Path(__file__).resolve().parents[2]
+
+
+def _repo_root(script: Path) -> Path:
+    """infrastructure/scripts/ops_check.py -> the repository root. Mounted at /ops/ops_check.py (the `ops` service) there is
+    no such parent, so fall back to the filesystem root; the image's own /app is searched separately."""
+    parents = script.resolve().parents
+    return parents[2] if len(parents) > 2 else parents[-1]
+
+
+REPO = _repo_root(Path(__file__))
 EXPECTED_SERVICES = ("db", "litellm", "api", "caddy")
 
 
@@ -78,8 +87,10 @@ def check_api(url: str, insecure_loopback: bool = False, timeout: float = 3.0) -
 
 
 def repo_head_revision() -> str | None:
+    """The newest migration revision shipped with this checkout, or with the image (/app) when run from the `ops` service."""
     revs = []
-    for f in (REPO / "database/migrations/versions").glob("*.py"):
+    versions = [REPO / "database/migrations/versions", Path("/app/database/migrations/versions")]
+    for f in (p for d in versions for p in d.glob("*.py")):
         m = re.search(r'^revision\s*=\s*"([^"]+)"', f.read_text(), re.M)
         if m:
             revs.append(m.group(1))

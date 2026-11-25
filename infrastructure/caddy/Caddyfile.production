@@ -40,6 +40,8 @@
 			request>headers>Idempotency-Key delete
 			request>headers>X-Forwarded-For delete
 			request>remote_ip delete
+			# the query string can carry search text or filters: log the path only
+			request>uri regexp \?.* ""
 			request>client_ip delete
 			resp_headers>Set-Cookie delete
 			wrap json

@@ -49,7 +49,12 @@ services:
     networks: !override [data]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
-    mem_limit: ${LITELLM_MEM_LIMIT:-1g}
+    # Measured: the pinned image needs well over 1 GiB while starting (it sat at the 1 GiB cap at ~100% CPU and never became healthy).
+    mem_limit: ${LITELLM_MEM_LIMIT:-2g}
+    environment:
+      # Use the model-cost map bundled in the image; without this it tries to download one from GitHub at start-up, which the
+      # gateway (no internet route) cannot do.
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
     pids_limit: 512
     stop_grace_period: 30s
     logging: *logging
@@ -68,6 +73,29 @@ services:
       ABU_CHECKPOINT_AUTO_SETUP: "false"
       ABU_LOG_FORMAT: json
     mem_limit: 512m
+
+  ops:
+    # Monitoring check runner (profile "ops": never started by `up`). The database publishes no port, so the database-backed
+    # checks run INSIDE the internal data network with the RUNTIME role (the check only reads). Host-level checks (containers,
+    # disk, backups, the public health URL) run on the host. See docs/operations/MONITORING.md.
+    #   docker compose ... run --rm ops
+    <<: *hardened
+    profiles: ["ops"]
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    entrypoint: ["python", "/ops/ops_check.py"]
+    restart: "no"
+    environment:
+      ABU_OPS_DATABASE_URL: postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+    volumes:
+      - ./scripts:/ops:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+    mem_limit: 256m
 
   api:
     <<: *hardened

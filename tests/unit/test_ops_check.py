@@ -165,3 +165,14 @@ def test_the_database_url_is_never_printed(tmp_path: Path, monkeypatch, capsys) 
     out = capsys.readouterr()
     assert code == 2 and "SuperSecretPw123" not in out.out + out.err
     assert "database unreachable" in out.out
+
+
+def test_the_script_works_when_mounted_shallowly_as_the_ops_service_does() -> None:
+    from pathlib import PurePosixPath
+
+    class Shallow:
+        def resolve(self):
+            return PurePosixPath("/ops/ops_check.py")
+
+    assert str(oc._repo_root(Shallow())) == "/"  # no IndexError at /ops/ops_check.py
+    assert oc._repo_root(Path(oc.__file__)) == ROOT  # unchanged in a checkout
