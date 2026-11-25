@@ -43,6 +43,8 @@ def deployment_problems(s: Settings) -> list[str]:
         p.append(
             "ABU_MIGRATION_DATABASE_URL (the OWNER role) must not be present in the runtime environment"
         )
+    if s.log_format != "json":
+        p.append("ABU_LOG_FORMAT must be json (structured, redacted logs)")
     if s.checkpoint_auto_setup:
         p.append("ABU_CHECKPOINT_AUTO_SETUP must be false: the runtime role has no DDL rights")
     spec = REGISTRY.get(s.embedder)

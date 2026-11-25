@@ -27,12 +27,14 @@ from services.api.auth import routes as auth_routes
 from services.api.config import Settings, get_settings
 from services.api.contracts import openapi as contracts_openapi
 from services.api.db import create_engine, create_sessionmaker
+from services.api.logging_config import configure_logging
 from services.api.middleware import (
     BodySizeLimitMiddleware,
     HardeningHeadersMiddleware,
     RateLimitMiddleware,
 )
 from services.api.ratelimit import RateLimiter
+from services.api.telemetry import AccessLogMiddleware
 
 
 def create_app(
@@ -43,6 +45,8 @@ def create_app(
 ) -> FastAPI:
     """`startup_check` (staging/production, via services.api.entrypoint) runs against the engine before the app serves."""
     settings = settings or get_settings()
+    if settings.log_format == "json":
+        configure_logging(settings.log_level)
     settings.require_auth_secrets()  # fail fast: never start without (distinct, strong) auth secrets
     limiter = limiter or RateLimiter()
     if settings.database_url is not None:
@@ -129,4 +133,8 @@ def create_app(
         },
     )
     app.add_middleware(HardeningHeadersMiddleware)
+    if (
+        settings.log_format == "json"
+    ):  # outermost: it sees every response, including 401/413/429 from the layers below
+        app.add_middleware(AccessLogMiddleware, anomaly_threshold=settings.auth_anomaly_threshold)
     return app

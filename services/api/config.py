@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # The OWNER role used only by the one-shot migration/bootstrap step (alembic, checkpoint tables, grants). It must
     # NOT be present in the API or admin runtime environment; the deployment guard refuses to start if it is.
     migration_database_url: SecretStr | None = None
+    # Structured JSON logs with redaction and a credential-free access log (services/api/logging_config.py, telemetry.py).
+    # "text" (default) leaves logging untouched; staging/production must use "json" (deployment guard).
+    log_format: Literal["text", "json"] = "text"
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    # 401/403/429 responses within 60 s that raise an `auth_anomaly` warning event.
+    auth_anomaly_threshold: int = Field(default=20, ge=3, le=10000)
     # LangGraph's saver creates its tables at startup (DDL). A least-privilege runtime role cannot do that, so
     # staging/production set this to false and the bootstrap step creates the tables as the owner.
     checkpoint_auto_setup: bool = True

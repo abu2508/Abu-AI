@@ -62,6 +62,7 @@ services:
     <<: *hardened
     environment:
       ABU_CHECKPOINT_AUTO_SETUP: "false"
+      ABU_LOG_FORMAT: json
     mem_limit: 512m
 
   api:
@@ -75,6 +76,8 @@ services:
       ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
       ABU_TRUSTED_PROXY_HOPS: "1"
       ABU_CHECKPOINT_AUTO_SETUP: "false"
+      ABU_LOG_FORMAT: json
+      UVICORN_ACCESS_LOG: "false"  # replaced by the application's credential-free JSON access log
       ABU_MEMORY_KEYRING_FILE: /run/secrets/memory_keyring
       ABU_MEMORY_KEYRING_STRICT_PERMISSIONS: "false"
       ABU_EMBEDDER: local-test-hash

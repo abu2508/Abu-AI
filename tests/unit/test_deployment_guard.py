@@ -23,6 +23,7 @@ def good(env: str = "staging", **over: object) -> Settings:
         "memory_keyring_file": "/run/secrets/memory_keyring",
         "trusted_proxy_hops": 1,
         "checkpoint_auto_setup": False,
+        "log_format": "json",
         "allow_test_embedder_in_production": True,  # staging's explicit "synthetic data only" statement
     }
     return Settings(**{**base, **over})  # type: ignore[arg-type]
@@ -63,6 +64,7 @@ def test_a_complete_staging_configuration_passes() -> None:
             "ABU_MIGRATION_DATABASE_URL",
         ),
         ({"checkpoint_auto_setup": True}, "ABU_CHECKPOINT_AUTO_SETUP"),
+        ({"log_format": "text"}, "ABU_LOG_FORMAT"),
         ({"allow_test_embedder_in_production": False}, "TEST embedder"),
         ({"embedder": "does-not-exist"}, "unknown embedder"),
     ],
