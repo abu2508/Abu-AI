@@ -1,0 +1,48 @@
+# PRODUCTION reverse proxy: NOT AUTHORISED FOR USE. A public HTTPS endpoint and DNS need separate owner approval.
+# ABU_DOMAIN and ABU_ACME_EMAIL have no defaults on purpose: the production overlay cannot start without them, so a
+# domain is never published by accident. Automatic HTTPS (Let's Encrypt) needs ports 80/443 reachable from the internet.
+{
+	admin off
+	email {$ABU_ACME_EMAIL}
+}
+
+{$ABU_DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 5MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		-Server
+	}
+
+	reverse_proxy api:8000 {
+		health_uri /health
+		health_interval 10s
+		health_timeout 3s
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 60s
+		}
+	}
+
+	log {
+		output stdout
+		format filter {
+			request>headers>Authorization delete
+			request>headers>Cookie delete
+			request>headers>Idempotency-Key delete
+			request>headers>X-Forwarded-For delete
+			request>remote_ip delete
+			request>client_ip delete
+			resp_headers>Set-Cookie delete
+			wrap json
+		}
+	}
+}

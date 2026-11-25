@@ -4,7 +4,7 @@ name: abu-ai
 
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16@sha256:484e838076e04939d27d3e176e91c86eea96236126023be8d3059761122e579f
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:?set in .env}
@@ -30,7 +30,7 @@ services:
     # No published ports: PostgreSQL is reachable only on the private "data" network.
 
   litellm:
-    image: ghcr.io/berriai/litellm:v1.83.14-stable.patch.3
+    image: ghcr.io/berriai/litellm:v1.83.14-stable.patch.3@sha256:f12d528d4a05add56cb09e54c5126088f2edc6bdf3a2f943bcd3a32b08769da2
     restart: unless-stopped
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:

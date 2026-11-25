@@ -34,4 +34,13 @@ if [[ ! -e secrets/memory-keyring.json ]]; then
   echo "ABU_UID=${abu_uid:-10001}" >> .env
   echo "Created secrets/memory-keyring.json (mode 600). Back it up SEPARATELY from database backups."
 fi
+# Staging / production: a separate database OWNER role (migrations only); APP_DB_USER becomes the runtime role.
+#   ABU_SPLIT_ROLES=1 ./infrastructure/scripts/gen-secrets.sh
+if [[ "${ABU_SPLIT_ROLES:-0}" == "1" ]]; then
+  {
+    echo "APP_DB_OWNER_USER=abu_owner"
+    echo "APP_DB_OWNER_PASSWORD=$(rand)"
+  } >> .env
+  echo "Added APP_DB_OWNER_USER/APP_DB_OWNER_PASSWORD (split database roles)."
+fi
 echo "Created .env (mode 600). Do not commit it."

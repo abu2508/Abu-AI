@@ -1,0 +1,15 @@
+# STAGING environment overlay: synthetic data only, loopback only. Layered after docker-compose.hardened.yml.
+# Not reachable from the network: Caddy listens on the host's 127.0.0.1 only; there is no DNS and no public firewall change.
+# Reach it from the host (or an SSH tunnel you open yourself) at https://localhost:8443 (self-signed internal CA).
+services:
+  api:
+    environment:
+      ABU_ENV: staging
+  admin:
+    environment:
+      ABU_ENV: staging
+  caddy:
+    ports:
+      - "127.0.0.1:${STAGING_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro

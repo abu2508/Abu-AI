@@ -1,0 +1,19 @@
+# PRODUCTION environment overlay: NOT AUTHORISED FOR USE. Production launch, a public endpoint and DNS each need separate
+# owner approval, gates G1-G4 must be satisfied, and the API's deployment guard refuses ABU_ENV=production while only the
+# test embedder exists (gate G4). ABU_DOMAIN and ABU_ACME_EMAIL are mandatory so a domain is never published by accident.
+services:
+  api:
+    environment:
+      ABU_ENV: production
+  admin:
+    environment:
+      ABU_ENV: production
+  caddy:
+    environment:
+      ABU_DOMAIN: ${ABU_DOMAIN:?set ABU_DOMAIN; production is not authorised without owner approval}
+      ABU_ACME_EMAIL: ${ABU_ACME_EMAIL:?set ABU_ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro

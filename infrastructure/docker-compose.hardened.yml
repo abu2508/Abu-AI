@@ -1,0 +1,119 @@
+# Shared hardening for STAGING and PRODUCTION. Never used for development.
+#
+#   docker compose --env-file .env -p abu-ai-staging \
+#     -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.hardened.yml \
+#     -f infrastructure/docker-compose.staging.yml up -d --build
+#
+# What it changes relative to the base file:
+#   * two database roles: the one-shot `migrate` step runs as the OWNER (migrations, checkpoint tables, grants); the API
+#     and the operator CLI connect as the least-privilege RUNTIME role and never see the owner credentials;
+#   * the API publishes no port and has no route to the internet: it is reachable only from Caddy, over an internal
+#     network, and talks to PostgreSQL and LiteLLM over the internal data network;
+#   * Caddy is the only edge container (TLS termination, security headers, body limit, credential-free logs);
+#   * containers drop every Linux capability they do not need, cannot gain privileges, have read-only root filesystems
+#     where verified (api, migrate, admin, caddy), memory/pids limits, bounded logs and a graceful stop period.
+# Environment (ABU_ENV, ports, Caddyfile) comes from the environment overlay that is layered after this file.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-nonroot-readonly: &hardened
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  pids_limit: 256
+  logging: *logging
+
+services:
+  db:
+    security_opt: ["no-new-privileges:true"]
+    # The official image starts as root to prepare the data directory, then drops to the postgres user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    environment:
+      APP_DB_OWNER_USER: ${APP_DB_OWNER_USER:?set in .env (the database OWNER role, migrations only)}
+      APP_DB_OWNER_PASSWORD: ${APP_DB_OWNER_PASSWORD:?set in .env}
+    mem_limit: ${DB_MEM_LIMIT:-1g}
+    pids_limit: 512
+    stop_grace_period: 60s
+    logging: *logging
+
+  litellm:
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    mem_limit: ${LITELLM_MEM_LIMIT:-1g}
+    pids_limit: 512
+    stop_grace_period: 30s
+    logging: *logging
+
+  migrate:
+    <<: *hardened
+    command: ["python", "-m", "services.admin", "db", "bootstrap"]
+    environment: !override
+      ABU_MIGRATION_DATABASE_URL: postgresql+psycopg://${APP_DB_OWNER_USER}:${APP_DB_OWNER_PASSWORD}@db:5432/${APP_DB_NAME}
+      ABU_RUNTIME_DB_ROLE: ${APP_DB_USER}
+    mem_limit: 512m
+
+  admin:
+    <<: *hardened
+    environment:
+      ABU_CHECKPOINT_AUTO_SETUP: "false"
+    mem_limit: 512m
+
+  api:
+    <<: *hardened
+    ports: !reset []
+    environment: !override
+      ABU_DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${APP_DB_NAME}
+      ABU_LITELLM_BASE_URL: http://litellm:4000
+      ABU_LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set in .env}
+      ABU_JWT_SECRET: ${JWT_SECRET:?set in .env}
+      ABU_TOKEN_HASH_KEY: ${TOKEN_HASH_KEY:?set in .env}
+      ABU_TRUSTED_PROXY_HOPS: "1"
+      ABU_CHECKPOINT_AUTO_SETUP: "false"
+      ABU_MEMORY_KEYRING_FILE: /run/secrets/memory_keyring
+      ABU_MEMORY_KEYRING_STRICT_PERMISSIONS: "false"
+      ABU_EMBEDDER: local-test-hash
+      ABU_ALLOW_TEST_EMBEDDER_IN_PRODUCTION: ${ALLOW_TEST_EMBEDDER_IN_PRODUCTION:-false}
+    networks: !override [data, proxy]
+    depends_on:
+      db:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: ${API_MEM_LIMIT:-768m}
+    stop_grace_period: 30s
+
+  caddy:
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    pids_limit: 128
+    mem_limit: 256m
+    logging: *logging
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    # `proxy`: internal link to the API (no internet). `edge`: the only network with a route out and with published ports.
+    networks: [proxy, edge]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  proxy:
+    internal: true

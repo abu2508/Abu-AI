@@ -1,0 +1,51 @@
+# STAGING reverse proxy. Reachable only on the host's loopback (see docker-compose.staging.yml); no public exposure,
+# no DNS. TLS uses Caddy's internal CA (self-signed): fine for loopback testing, never for a public endpoint.
+{
+	admin off
+	local_certs
+	auto_https disable_redirects
+}
+
+https://localhost {
+	encode zstd gzip
+
+	# Caddy trusts NO upstream proxy (no `trusted_proxies`): it replaces any client-sent X-Forwarded-For with the real
+	# peer address, and the API reads exactly that one hop (ABU_TRUSTED_PROXY_HOPS=1). A spoofed header cannot reach it.
+	request_body {
+		max_size 5MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		-Server
+	}
+
+	reverse_proxy api:8000 {
+		health_uri /health
+		health_interval 10s
+		health_timeout 3s
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 60s
+		}
+	}
+
+	# Access logs without credentials or bodies.
+	log {
+		output stdout
+		format filter {
+			request>headers>Authorization delete
+			request>headers>Cookie delete
+			request>headers>Idempotency-Key delete
+			request>headers>X-Forwarded-For delete
+			request>remote_ip delete
+			request>client_ip delete
+			resp_headers>Set-Cookie delete
+			wrap json
+		}
+	}
+}
