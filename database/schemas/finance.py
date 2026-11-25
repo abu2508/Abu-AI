@@ -90,6 +90,48 @@ class FinTransaction(Base):
             "source IN ('manual','voice','sms','email','shortcut','share','csv','xlsx','pdf')",
             name="source_valid",
         ),
+        # S2.1A classification safety. Every new column is nullable and unset on historical rows (no backfill).
+        CheckConstraint(
+            "classification_confidence IS NULL OR (classification_confidence >= 0 AND classification_confidence <= 1)",
+            name="classification_confidence_range",
+        ),
+        CheckConstraint(
+            "review_reason IS NULL OR review_reason IN "
+            "('unknown_credit','unlinked_transfer','ambiguous_transfer','emi_unverified')",
+            name="review_reason_valid",
+        ),
+        CheckConstraint(
+            "review_reason IS NULL OR status = 'pending_review'",
+            name="review_reason_requires_pending",
+        ),
+        CheckConstraint(
+            "transfer_peer_id IS NULL OR transfer_peer_id <> id", name="transfer_peer_not_self"
+        ),
+        CheckConstraint(
+            "transfer_peer_id IS NULL OR (kind = 'transfer' AND status = 'confirmed')",
+            name="transfer_peer_requires_transfer",
+        ),
+        CheckConstraint(
+            "(emi_principal IS NULL) = (emi_interest IS NULL)", name="emi_split_complete"
+        ),
+        CheckConstraint(
+            "emi_principal IS NULL OR (emi_principal >= 0 AND emi_interest >= 0)",
+            name="emi_split_non_negative",
+        ),
+        CheckConstraint(
+            "emi_principal IS NULL OR emi_principal + emi_interest = amount", name="emi_split_sum"
+        ),
+        CheckConstraint(
+            "emi_principal IS NULL OR (kind = 'emi' AND direction = 'debit')",
+            name="emi_split_requires_emi_debit",
+        ),
+        CheckConstraint("loan_id IS NULL OR emi_principal IS NOT NULL", name="loan_requires_split"),
+        Index(
+            "uq_fin_txn_transfer_peer",
+            "transfer_peer_id",
+            unique=True,
+            postgresql_where="transfer_peer_id IS NOT NULL",
+        ),
         Index("ix_fin_txn_user_date", "user_id", "txn_date"),
         Index("ix_fin_txn_user_dedupe", "user_id", "dedupe_key"),
         # The same raw notification/statement row can never be ingested twice.
@@ -127,6 +169,20 @@ class FinTransaction(Base):
     )
     reconciled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_col()
+    # --- S2.1A. NULL classification_confidence = a historical row: never routed, linked, demoted or re-reported.
+    classification_confidence: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
+    review_reason: Mapped[str | None] = mapped_column(
+        String(24)
+    )  # only while status = pending_review
+    # The other leg of an own-account transfer (reciprocal, enforced by a deferred trigger; see migration 0012).
+    transfer_peer_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fin_transactions.id", ondelete="SET NULL")
+    )
+    loan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fin_loans.id", ondelete="SET NULL")
+    )
+    emi_principal: Mapped[Decimal | None] = mapped_column(Money)
+    emi_interest: Mapped[Decimal | None] = mapped_column(Money)
 
 
 class FinMerchantRule(Base):

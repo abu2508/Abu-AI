@@ -1547,6 +1547,56 @@
         "title": "DraftOut",
         "type": "object"
       },
+      "EmiSplitIn": {
+        "additionalProperties": false,
+        "description": "A user-supplied principal/interest split of an EMI debit. Validated again by the service (they must add up).",
+        "properties": {
+          "interest": {
+            "anyOf": [
+              {
+                "maximum": 999999999.99,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Interest"
+          },
+          "loan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loan Id"
+          },
+          "principal": {
+            "anyOf": [
+              {
+                "maximum": 999999999.99,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Principal"
+          }
+        },
+        "required": [
+          "principal",
+          "interest"
+        ],
+        "title": "EmiSplitIn",
+        "type": "object"
+      },
       "EnrollRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1595,7 +1645,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared.",
+            "description": "Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, ambiguous_card_amount_sign, category_required, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_emi_split, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared, unsupported_currency.",
             "title": "Code",
             "type": "string"
           },
@@ -9158,6 +9208,64 @@
           }
         ],
         "summary": "Confirm",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/v1/finance/transactions/{txn_id}/emi-split": {
+      "post": {
+        "operationId": "emi_split_v1_finance_transactions__txn_id__emi_split_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "txn_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Txn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmiSplitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Emi Split V1 Finance Transactions  Txn Id  Emi Split Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Emi Split",
         "tags": [
           "finance"
         ]

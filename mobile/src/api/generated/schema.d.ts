@@ -979,6 +979,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/finance/transactions/{txn_id}/emi-split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Emi Split */
+        post: operations["emi_split_v1_finance_transactions__txn_id__emi_split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/finance/transactions/{txn_id}/reject": {
         parameters: {
             query?: never;
@@ -2015,6 +2032,18 @@ export interface components {
             /** Tone */
             tone: string;
         };
+        /**
+         * EmiSplitIn
+         * @description A user-supplied principal/interest split of an EMI debit. Validated again by the service (they must add up).
+         */
+        EmiSplitIn: {
+            /** Interest */
+            interest: number | string;
+            /** Loan Id */
+            loan_id?: string | null;
+            /** Principal */
+            principal: number | string;
+        };
         /** EnrollRequest */
         EnrollRequest: {
             /** Device Name */
@@ -2039,7 +2068,7 @@ export interface components {
         ErrorBody: {
             /**
              * Code
-             * @description Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared.
+             * @description Stable machine code. Open set: clients must tolerate unknown codes. Known orchestrator codes: invalid_request, idempotency_conflict, request_in_progress, kill_switch_active, governance_unavailable, governance_refused, permission_denied, spending_blocked, limit_exceeded, model_unavailable, memory_unavailable, timeout, internal_error, malformed_output, provider_error. Known domain codes: already_checked_in, already_imported, ambiguous_card_amount_sign, category_required, conversation_full, credit_limit_required, import_failed, invalid_category, invalid_channel, invalid_date, invalid_emi_split, invalid_format, invalid_hours, invalid_loan, invalid_range, invalid_timezone, not_found, not_shared, unsupported_currency.
              */
             code: string;
             /**
@@ -5520,6 +5549,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    emi_split_v1_finance_transactions__txn_id__emi_split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmiSplitIn"];
             };
         };
         responses: {

@@ -4,7 +4,7 @@ draft transaction. Deterministic. Always reviewed by the user before it counts (
 import re
 from datetime import date, timedelta
 
-from domain.finance.money import ParseError, parse_amount, parse_date
+from domain.finance.money import ParseError, has_other_currency, parse_amount, parse_date
 from domain.finance.types import RawTxn
 
 _AMT = re.compile(
@@ -21,6 +21,8 @@ def parse_voice(transcript: str, today: date) -> RawTxn:
     t = re.sub(r"\s+", " ", transcript).strip()
     if not t or len(t) > 300:
         raise ParseError("transcript_invalid")
+    if has_other_currency(t):
+        raise ParseError("unsupported_currency")  # V1 is INR only: never guess a conversion
     m = _AMT.search(t)
     if not m:
         raise ParseError("no_amount")

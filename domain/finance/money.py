@@ -6,7 +6,18 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 CENT = Decimal("0.01")
 MAX_AMOUNT = Decimal("1000000000")  # 100 crore: anything larger is treated as a parsing error
-_CCY = re.compile(r"(?i)(₹|\binr\b|\brs\.?|\brupees?\b|\$|\busd\b)")
+_CCY = re.compile(r"(?i)(₹|\binr\b|\brs\.?|\brupees?\b)")  # the ONLY currency V1 supports: INR
+# Any other currency marker (symbol, ISO code or name) is REJECTED, never stripped: 'USD 100' must not become INR 100.
+_CODES = (
+    "usd|eur|gbp|aed|sgd|cad|aud|jpy|cny|chf|sar|qar|kwd|bhd|omr|npr|lkr|bdt|pkr|myr|thb|hkd|nzd"
+)
+_NAMES = "dollars?|euros?|pounds?|dirhams?|yen|bucks"
+# A symbol, or a code/name directly beside a number ('USD 5', '5 EUR', '5 dollars'); merchant words are not matched.
+_OTHER_CCY = re.compile(rf"(?i)([$€£¥]|\b(?:{_CODES})\b\s*[0-9]|[0-9]\s*(?:{_CODES}|{_NAMES})\b)")
+
+
+def has_other_currency(text: str) -> bool:
+    return bool(_OTHER_CCY.search(text))
 
 
 class ParseError(ValueError):
@@ -24,6 +35,8 @@ def parse_amount(raw: str | int | float | Decimal) -> Decimal:
         val = raw
     else:
         s = str(raw).strip()
+        if _OTHER_CCY.search(s):
+            raise ParseError("unsupported_currency")
         neg = s.startswith("(") and s.endswith(")") or s.startswith("-")
         s = (
             _CCY.sub("", s)

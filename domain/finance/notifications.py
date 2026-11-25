@@ -13,7 +13,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Protocol
 
-from domain.finance.money import ParseError, parse_amount, parse_date
+from domain.finance.money import ParseError, has_other_currency, parse_amount, parse_date
 from domain.finance.types import RawTxn
 
 MAX_TEXT = 2000
@@ -62,6 +62,10 @@ class GenericAlertParser:
     def parse(self, text: str, received_on: date) -> Parsed | None:
         t = re.sub(r"\s+", " ", text).strip()
         if not t or len(t) > MAX_TEXT or _OTP.search(t):
+            return None
+        if has_other_currency(
+            t
+        ):  # INR only: an alert naming another currency is not parsed (stays unparsed, never guessed)
             return None
         am = re.search(_AMT, t, re.I)
         if not am:

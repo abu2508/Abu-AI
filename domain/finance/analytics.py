@@ -28,6 +28,11 @@ class TxnView:
     kind: str
     merchant_hash: str | None = None
     account_id: str | None = None
+    # S2.1A. A confirmed EMI with a RELIABLE split: only the interest is recognised expense (the principal repays a
+    # liability). A confirmed NEW EMI without a split is cash outflow but NOT recognised expense. Both default to the
+    # legacy behaviour (the whole debit is expense), which historical rows keep.
+    emi_interest: Decimal | None = None
+    unsplit_emi: bool = False
 
 
 def month_bounds(year: int, month: int) -> tuple[date, date]:
@@ -112,6 +117,13 @@ def _counted(txns: Iterable[TxnView]) -> list[TxnView]:
     return [t for t in txns if t.kind != "transfer"]
 
 
+def recognised_debit(t: TxnView) -> Decimal:
+    """The part of a debit that is recognised EXPENSE (cash outflow is always the full amount)."""
+    if t.unsplit_emi:
+        return ZERO
+    return t.emi_interest if t.emi_interest is not None else t.amount
+
+
 def summarise(txns: Iterable[TxnView], start: date, end: date) -> dict[str, object]:
     """Income, expense, net and savings rate for [start, end]. Credits of kind 'refund' REDUCE expense in their
     category instead of counting as income; transfers are excluded entirely."""
@@ -122,8 +134,9 @@ def summarise(txns: Iterable[TxnView], start: date, end: date) -> dict[str, obje
         if not start <= t.txn_date <= end:
             continue
         if t.direction == "debit":
-            expense += t.amount
-            by_cat[t.category] += t.amount
+            amt = recognised_debit(t)
+            expense += amt
+            by_cat[t.category] += amt
         elif t.kind == "refund":
             expense -= t.amount
             by_cat[t.category if t.category != "refunds" else "uncategorized"] -= t.amount
@@ -159,7 +172,9 @@ def cashflow(
             signed = t.amount if t.direction == "credit" else -t.amount
             days[t.txn_date] += signed
             if t.direction == "debit":
-                spent += t.amount
+                spent += recognised_debit(
+                    t
+                )  # the pace of recognised expense; the cash series above is the full amount
             elif t.kind == "refund":
                 spent -= t.amount
     series, run = [], opening
@@ -332,14 +347,17 @@ def insights(
                     "budget_near_limit", "warning", {"category": b["category"], "pct": b["pct"]}
                 )
             )
-    debits = [t.amount for t in _counted(txns) if t.direction == "debit"]
+    debits = [
+        recognised_debit(t) for t in _counted(txns) if t.direction == "debit" and not t.unsplit_emi
+    ]
     if len(debits) >= 5:
         med = statistics.median(debits)
         for t in sorted(_counted(txns), key=lambda t: -t.amount):
             if (
                 t.direction == "debit"
-                and t.amount > 3 * med
-                and t.amount >= 2000
+                and not t.unsplit_emi
+                and recognised_debit(t) > 3 * med
+                and recognised_debit(t) >= 2000
                 and t.txn_date.year == today.year
                 and t.txn_date.month == today.month
             ):
@@ -347,7 +365,11 @@ def insights(
                     Insight(
                         "unusually_large_expense",
                         "warning",
-                        {"date": t.txn_date, "amount": t.amount, "typical": q(Decimal(med))},
+                        {
+                            "date": t.txn_date,
+                            "amount": recognised_debit(t),
+                            "typical": q(Decimal(med)),
+                        },
                     )
                 )
                 break

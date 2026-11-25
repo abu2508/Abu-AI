@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.schemas import (
@@ -27,7 +27,14 @@ from domain.common.crypto import FieldCipher
 from domain.finance import analytics as an
 from domain.finance import importers
 from domain.finance.money import ParseError, q
-from domain.finance.normalize import CATEGORIES, categorise, normalise_merchant
+from domain.finance.normalize import (
+    CATEGORIES,
+    CONF_USER,
+    categorise,
+    classify,
+    is_low_confidence,
+    normalise_merchant,
+)
 from domain.finance.notifications import parse_notification
 from domain.finance.types import ImportFailed, RawTxn
 from domain.finance.voice import parse_voice
@@ -36,6 +43,12 @@ NOTIF = frozenset({"sms", "email", "shortcut", "share"})
 STMT = frozenset({"csv", "xlsx", "pdf"})
 FUZZY_DAYS = 2
 FUZZY_RATIO = 0.5
+TRANSFER_WINDOW_DAYS = (
+    3  # both legs of an own-account transfer post within this many days of each other
+)
+EMI_WINDOW_DAYS = (
+    5  # an EMI debit may differ from the schedule's due date by this many days and still match
+)
 MIN_DESC = "unknown"
 
 
@@ -245,38 +258,224 @@ class FinanceService:
                 break
 
         rule = await self._rule(user_id, mh)
-        cat = categorise(desc, raw.direction, category or rule)
+        cls = classify(desc, raw.direction, account.kind, category or rule)
+        reason: str | None = None
         if dup_of is not None:
             status = "duplicate_suspect"
-        elif source in NOTIF | {"voice"} and not account.auto_confirm:
-            status = "pending_review"
         else:
-            status = "confirmed"
-        tid = uuid.uuid4()
-        self._s.add(
-            FinTransaction(
-                id=tid,
-                user_id=user_id,
-                account_id=account.id,
-                txn_date=raw.txn_date,
-                amount=raw.amount,
-                direction=raw.direction,
-                category=cat.category,
-                kind=cat.kind,
-                description_enc=self._c.seal(user_id, tid, "fin.txn.desc", desc),
-                merchant_hash=mh,
-                reference_hash=ref_hash,
-                dedupe_key=dedupe,
-                source_hash=source_hash,
-                source=source,
-                status=status,
-                confidence=min(confidence, Decimal(1)),
-                duplicate_of=dup_of.id if dup_of else None,
-                batch_id=batch_id,
+            status = (
+                "pending_review"
+                if source in NOTIF | {"voice"} and not account.auto_confirm
+                else "confirmed"
             )
+            # Review routing (S2.1A): applies to EVERY source and even to auto_confirm accounts.
+            if raw.direction == "credit" and is_low_confidence(cls.confidence):
+                status, reason = (
+                    "pending_review",
+                    "unknown_credit",
+                )  # an unknown credit is never silently income
+            elif cls.transfer_evidence:
+                status, reason = (
+                    "pending_review",
+                    "unlinked_transfer",
+                )  # held until the other leg is found or the user decides
+        split = None
+        if dup_of is None and cls.kind == "emi" and raw.direction == "debit":
+            split = await self._emi_split_for(user_id, raw)
+            if split is None:
+                status, reason = (
+                    "pending_review",
+                    "emi_unverified",
+                )  # no reliable principal/interest split
+        tid = uuid.uuid4()
+        row = FinTransaction(
+            id=tid,
+            user_id=user_id,
+            account_id=account.id,
+            txn_date=raw.txn_date,
+            amount=raw.amount,
+            direction=raw.direction,
+            category=cls.category,
+            kind=cls.kind,
+            description_enc=self._c.seal(user_id, tid, "fin.txn.desc", desc),
+            merchant_hash=mh,
+            reference_hash=ref_hash,
+            dedupe_key=dedupe,
+            source_hash=source_hash,
+            source=source,
+            status=status,
+            confidence=min(confidence, Decimal(1)),
+            duplicate_of=dup_of.id if dup_of else None,
+            batch_id=batch_id,
+            classification_confidence=cls.confidence,
+            review_reason=reason,
         )
+        if split is not None:
+            loan, inst = split
+            row.loan_id, row.emi_principal, row.emi_interest = (
+                loan.id,
+                inst.principal,
+                inst.interest,
+            )
+        self._s.add(row)
         await self._s.flush()
-        return Outcome("inserted", tid, status, confidence)
+        if reason == "unlinked_transfer":
+            await self._try_link(user_id, row)
+        return Outcome("inserted", tid, row.status, confidence)
+
+    # ------------------------------------------------------------------ transfer links (S2.1A)
+    @staticmethod
+    def _link_eligible(t: FinTransaction) -> bool:
+        """A leg that may take part in an automatic link. NEVER a confirmed non-transfer row, a legacy row (NULL
+        confidence), a duplicate suspect, a rejected row or an already-linked row. A pending leg must carry its own
+        description evidence (confidence below 1.00); a confirmed leg must be an explicit user assertion (1.00)."""
+        c = t.classification_confidence
+        if (
+            c is None
+            or t.kind != "transfer"
+            or t.transfer_peer_id is not None
+            or t.duplicate_of is not None
+        ):
+            return False
+        if t.status == "pending_review":
+            return t.review_reason in ("unlinked_transfer", "ambiguous_transfer") and c < CONF_USER
+        return t.status == "confirmed" and c == CONF_USER
+
+    async def _partners(self, user_id: uuid.UUID, row: FinTransaction) -> list[FinTransaction]:
+        lo = row.txn_date - timedelta(days=TRANSFER_WINDOW_DAYS)
+        hi = row.txn_date + timedelta(days=TRANSFER_WINDOW_DAYS)
+        evidenced = and_(
+            FinTransaction.status == "pending_review",
+            FinTransaction.review_reason.in_(("unlinked_transfer", "ambiguous_transfer")),
+            FinTransaction.classification_confidence < CONF_USER,
+        )
+        asserted = and_(
+            FinTransaction.status == "confirmed",
+            FinTransaction.classification_confidence == CONF_USER,
+        )
+        res = await self._s.execute(
+            select(FinTransaction)
+            .where(
+                FinTransaction.user_id == user_id,
+                FinTransaction.id != row.id,
+                FinTransaction.account_id != row.account_id,
+                FinTransaction.direction == ("credit" if row.direction == "debit" else "debit"),
+                FinTransaction.amount
+                == row.amount,  # exact; V1 is INR only so the currency always matches
+                FinTransaction.txn_date.between(lo, hi),
+                FinTransaction.kind == "transfer",
+                FinTransaction.transfer_peer_id.is_(None),
+                FinTransaction.duplicate_of.is_(None),
+                FinTransaction.classification_confidence.is_not(None),
+                or_(evidenced, asserted),
+            )
+            .order_by(FinTransaction.created_at, FinTransaction.id)
+            .with_for_update()
+        )
+        return list(res.scalars())
+
+    async def _link_pair(self, a: FinTransaction, b: FinTransaction) -> None:
+        """Both legs in ONE flush (the request transaction is the atomic unit; a deferred database trigger proves the
+        link is reciprocal at COMMIT). Only the peer pointer, status and reason change: amounts, dates, descriptions,
+        categories, kinds and confidences of an established row are never rewritten."""
+        for x, y in ((a, b), (b, a)):
+            x.transfer_peer_id = y.id
+            x.kind = "transfer"
+            x.status = "confirmed"
+            x.review_reason = None
+        await self._s.flush()
+
+    async def _try_link(self, user_id: uuid.UUID, t: FinTransaction) -> bool:
+        """Link `t` with its counterpart ONLY if exactly one eligible partner exists AND `t` is that partner's only
+        eligible partner. Anything else stays under review (ambiguous matches are marked, never guessed)."""
+        if not self._link_eligible(t):
+            return False
+        cands = await self._partners(user_id, t)
+        unique = len(cands) == 1
+        if unique:
+            back = await self._partners(user_id, cands[0])
+            unique = len(back) == 1 and back[0].id == t.id
+        if not unique:
+            if cands and t.status == "pending_review":
+                t.review_reason = "ambiguous_transfer"
+            return False
+        await self._link_pair(t, cands[0])
+        return True
+
+    async def _unlink(self, user_id: uuid.UUID, t: FinTransaction) -> None:
+        """Detach BOTH legs. A survivor that was confirmed only because of the link goes back to review; a leg the user
+        asserted (confidence 1.00) stays confirmed. Nothing is deleted."""
+        if t.transfer_peer_id is None:
+            return
+        peer = await self._s.get(FinTransaction, t.transfer_peer_id)
+        t.transfer_peer_id = None
+        if peer is not None and peer.user_id == user_id:
+            peer.transfer_peer_id = None
+            c = peer.classification_confidence
+            if (
+                peer.status == "confirmed"
+                and peer.kind == "transfer"
+                and c is not None
+                and c < CONF_USER
+            ):
+                peer.status, peer.review_reason = "pending_review", "unlinked_transfer"
+        await self._s.flush()
+
+    # ------------------------------------------------------------------ EMI (S2.1A)
+    async def _emi_split_for(
+        self, user_id: uuid.UUID, raw: RawTxn
+    ) -> tuple[FinLoan, an.Installment] | None:
+        """A split is RELIABLE only when exactly one active loan has an instalment whose EMI equals the amount exactly and
+        whose due date is within EMI_WINDOW_DAYS of the transaction date."""
+        hits = [
+            (loan, inst)
+            for loan in await self.loans(user_id)
+            if loan.status == "active"
+            for inst in self.loan_schedule(loan)
+            if inst.emi == raw.amount and abs((inst.due - raw.txn_date).days) <= EMI_WINDOW_DAYS
+        ]
+        return hits[0] if len(hits) == 1 else None
+
+    async def set_emi_split(
+        self,
+        user_id: uuid.UUID,
+        txn_id: uuid.UUID,
+        principal: Decimal,
+        interest: Decimal,
+        loan_id: uuid.UUID | None = None,
+    ) -> FinTransaction:
+        t = await self._own_txn(user_id, txn_id)
+        if (
+            t.kind != "emi"
+            or t.direction != "debit"
+            or t.status not in ("pending_review", "confirmed")
+        ):
+            raise FinanceError(
+                "invalid_emi_split", "only an EMI debit under review or confirmed can be split"
+            )
+        p, i = q(principal), q(interest)
+        if p < 0 or i < 0 or p + i != t.amount:
+            raise FinanceError(
+                "invalid_emi_split",
+                "principal and interest must be non-negative and add up to the amount",
+            )
+        if loan_id is not None:
+            loan = (
+                await self._s.execute(
+                    select(FinLoan).where(
+                        FinLoan.id == loan_id,
+                        FinLoan.user_id == user_id,
+                        FinLoan.status == "active",
+                    )
+                )
+            ).scalar_one_or_none()
+            if loan is None:
+                raise FinanceError("invalid_emi_split", "loan not found")
+        t.emi_principal, t.emi_interest, t.loan_id = p, i, loan_id
+        t.classification_confidence = CONF_USER  # the user decided
+        if t.status == "pending_review" and t.review_reason == "emi_unverified":
+            t.review_reason = None
+        return t
 
     # ------------------------------------------------------------------ entry channels
     async def add_manual(
@@ -294,6 +493,10 @@ class FinanceService:
         try:
             raw = parse_voice(transcript, self.today())
         except ParseError as exc:
+            if str(exc) == "unsupported_currency":
+                raise FinanceError(
+                    "unsupported_currency", "only INR is supported in this version"
+                ) from None
             raise FinanceError(
                 "voice_unparsed", f"could not understand the entry ({exc})"
             ) from None
@@ -353,7 +556,13 @@ class FinanceService:
         if reader is None:
             raise FinanceError("invalid_format", "format must be csv, xlsx or pdf")
         try:
-            result = reader(data, self.today())
+            result = reader(data, self.today(), account.kind)
+        except importers.AmbiguousDirection:
+            raise FinanceError(
+                "ambiguous_card_amount_sign",
+                "this card statement does not say whether an amount is a purchase or a payment; use Debit/Credit "
+                "columns, a Type column or Dr/Cr markers",
+            ) from None
         except ImportFailed as exc:
             raise FinanceError("import_failed", f"the file could not be imported ({exc})") from None
         fhash = self._c.hash(user_id, "fin.file", kind, str(account_id), _sha(data))
@@ -426,6 +635,12 @@ class FinanceService:
             else None,
             "duplicate_of": t.duplicate_of,
             "reconciled": t.reconciled_at is not None,
+            "classification_confidence": t.classification_confidence,
+            "review_reason": t.review_reason,
+            "transfer_peer_id": t.transfer_peer_id,
+            "loan_id": t.loan_id,
+            "emi_principal": t.emi_principal,
+            "emi_interest": t.emi_interest,
         }
 
     async def transactions(
@@ -488,15 +703,30 @@ class FinanceService:
                 "only a pending or suspected-duplicate transaction can be confirmed",
                 409,
             )
+        if t.review_reason == "unknown_credit" and category is None:
+            raise FinanceError(
+                "category_required", "choose what this incoming credit is before confirming it", 422
+            )
+        asserts_transfer = t.review_reason in ("unlinked_transfer", "ambiguous_transfer")
         t.status = "confirmed"
         t.duplicate_of = None
+        t.review_reason = None
         if category is not None:
-            await self.set_category(user_id, txn_id, category, remember)
+            await self.set_category(
+                user_id, txn_id, category, remember
+            )  # records the user's decision (1.00)
+        elif asserts_transfer:
+            t.classification_confidence = (
+                CONF_USER  # the user asserts this is an own-account transfer
+            )
+            await self._try_link(user_id, t)
         return t
 
     async def reject(self, user_id: uuid.UUID, txn_id: uuid.UUID) -> FinTransaction:
         t = await self._own_txn(user_id, txn_id)
+        await self._unlink(user_id, t)
         t.status = "rejected"
+        t.review_reason = None
         return t
 
     async def set_category(
@@ -505,8 +735,16 @@ class FinanceService:
         if category not in CATEGORIES:
             raise FinanceError("invalid_category", "unknown category")
         t = await self._own_txn(user_id, txn_id)
+        new_kind = categorise("", t.direction, category).kind
+        if t.transfer_peer_id is not None and new_kind != "transfer":
+            await self._unlink(user_id, t)  # leaving 'transfers' detaches both legs
         t.category = category
-        t.kind = categorise("", t.direction, category).kind
+        t.kind = new_kind
+        t.classification_confidence = CONF_USER  # an explicit user decision
+        if new_kind != "emi":
+            t.emi_principal = t.emi_interest = t.loan_id = None
+        if t.status == "pending_review":
+            t.review_reason = None
         if remember and t.merchant_hash:
             existing = (
                 await self._s.execute(
@@ -524,16 +762,24 @@ class FinanceService:
                         user_id=user_id, merchant_hash=t.merchant_hash, category=category
                     )
                 )
+        await self._s.flush()
+        if new_kind == "transfer" and t.status == "confirmed" and t.transfer_peer_id is None:
+            await self._try_link(user_id, t)  # an explicit assertion may now find its other leg
         return t
 
     async def confirm_all_pending(
         self, user_id: uuid.UUID, min_confidence: Decimal = Decimal("0.75")
     ) -> int:
+        """Bulk-confirm high-confidence parsed notifications. A row waiting for a REVIEW REASON (unknown credit, unlinked
+        or ambiguous transfer, unverified EMI) is never bulk-confirmed. Unknown DEBITS are not routed to review (the
+        policy covers credits), so they stay bulk-confirmable exactly as before. A historical row has no reason, so it
+        follows the old predicate unchanged: pending to confirmed, nothing else about it is touched."""
         res = await self._s.execute(
             update(FinTransaction)
             .where(
                 FinTransaction.user_id == user_id,
                 FinTransaction.status == "pending_review",
+                FinTransaction.review_reason.is_(None),
                 FinTransaction.confidence >= min_confidence,
             )
             .values(status="confirmed")
@@ -541,7 +787,8 @@ class FinanceService:
         return int(res.rowcount or 0)  # type: ignore[attr-defined]
 
     async def delete_transaction(self, user_id: uuid.UUID, txn_id: uuid.UUID) -> None:
-        await self._own_txn(user_id, txn_id)
+        t = await self._own_txn(user_id, txn_id)
+        await self._unlink(user_id, t)  # the surviving leg is demoted in the same transaction
         await self._s.execute(
             delete(FinTransaction).where(
                 FinTransaction.id == txn_id, FinTransaction.user_id == user_id
@@ -719,6 +966,11 @@ class FinanceService:
                 t.kind,
                 t.merchant_hash,
                 str(t.account_id),
+                emi_interest=t.emi_interest,
+                # a NEW confirmed EMI without a split is cash outflow, not recognised expense; legacy rows keep today's rule
+                unsplit_emi=t.kind == "emi"
+                and t.classification_confidence is not None
+                and t.emi_principal is None,
             )
             for t in (await self._s.execute(q_)).scalars()
         ]

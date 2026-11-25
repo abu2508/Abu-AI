@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 
 CATEGORIES = (
     "groceries",
@@ -134,3 +135,85 @@ def categorise(description: str, direction: str, user_rule: str | None = None) -
         "refunds": "refund",
     }.get(cat, "income" if direction == "credit" else "expense")
     return Categorised(cat, kind, conf)
+
+
+# ---------------------------------------------------------------------------------- classification safety (S2.1A)
+# ONE central threshold. Today's scale only produces 0.00 (no rule matched), 0.80 (a keyword rule) and 1.00 (the user's
+# own choice), so any value in (0.00, 0.80] behaves identically; 0.50 is therefore not a tuning knob. Strictly "less
+# than": exactly 0.50 is NOT low. 1.00 only ever means "decided by the user" (an explicit category or remembered rule).
+CLASSIFICATION_REVIEW_THRESHOLD = Decimal("0.50")
+REVIEW_REASONS = ("unknown_credit", "unlinked_transfer", "ambiguous_transfer", "emi_unverified")
+CONF_RULE = Decimal("0.80")
+CONF_USER = Decimal("1.00")
+CONF_NONE = Decimal("0.00")
+
+
+def is_low_confidence(confidence: Decimal) -> bool:
+    return confidence < CLASSIFICATION_REVIEW_THRESHOLD
+
+
+def _conf(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"))
+
+
+_CARD_NAME = re.compile(r"\bcredit\s*card\b", re.I)
+_CARD_BILL_WORDS = re.compile(r"\b(pay(ment|mt)?|pymt|bill|due|outstanding|autopay)\b", re.I)
+_CARD_SHORT = re.compile(r"\b(cc|card)\s*(bill|pay(ment|mt)?|pymt)\b", re.I)
+_PHRASE_DEBIT = re.compile(r"\b(self transfer|own account|fund transfer|to self)\b", re.I)
+_PHRASE_CREDIT = re.compile(r"\b(self transfer|own account|fund transfer|from self)\b", re.I)
+_CARD_RECEIPT = re.compile(
+    r"(\bpayment\b.*\b(received|recd|rcvd|thank)\b|\b(received|recd|rcvd)\b.*\bpayment\b"
+    r"|\bthank\s*you\b|\bbbps\b|\bautopay\b)",
+    re.I,
+)
+_REFUND_WORDS = re.compile(r"\b(refund|reversal|cashback|chargeback)\b", re.I)
+
+
+@dataclass(frozen=True)
+class Classification:
+    category: str
+    kind: str  # expense | income | transfer | emi | fee | refund
+    confidence: Decimal
+    # True only when a deterministic DESCRIPTION pattern (card payment / own-account phrase) says "transfer". A user's
+    # choice of 'transfers' has confidence 1.00 and is an assertion, not pattern evidence.
+    transfer_evidence: bool = False
+
+
+def classify(
+    description: str, direction: str, account_kind: str, user_rule: str | None = None
+) -> Classification:
+    """Deterministic classification with account awareness. `categorise` (unchanged) supplies merchant rules.
+
+    - non-card debit: card-payment / own-account patterns are checked BEFORE merchant rules (so 'SELF TRANSFER ... STORE
+      CREDIT' is a transfer candidate, not shopping). 'RENT TRANSFER' matches none of them and stays rent;
+    - card debit: ordinary merchant rules, never a transfer by description;
+    - card credit: payment receipt -> transfer candidate; refund -> refund; both words -> unknown; neither -> unknown;
+    - 'payment received' wording means a card payment ONLY on a card account; on a bank it is an unknown credit.
+    """
+    card = account_kind == "credit_card"
+    if user_rule:
+        c = categorise(description, direction, user_rule)
+        return Classification(c.category, c.kind, CONF_USER)
+    if direction == "debit":
+        if not card and (
+            _PHRASE_DEBIT.search(description)
+            or _CARD_SHORT.search(description)
+            or (_CARD_NAME.search(description) and _CARD_BILL_WORDS.search(description))
+        ):
+            return Classification("transfers", "transfer", CONF_RULE, True)
+    elif card:
+        refund, receipt = (
+            bool(_REFUND_WORDS.search(description)),
+            bool(_CARD_RECEIPT.search(description)),
+        )
+        if refund and receipt:
+            return Classification("other_income", "income", CONF_NONE)
+        if receipt:
+            return Classification("transfers", "transfer", CONF_RULE, True)
+        if not refund:
+            return Classification("other_income", "income", CONF_NONE)
+    elif _PHRASE_CREDIT.search(description):
+        return Classification("transfers", "transfer", CONF_RULE, True)
+    c = categorise(description, direction, None)
+    conf = _conf(c.confidence)
+    return Classification(c.category, c.kind, conf, c.kind == "transfer" and conf < CONF_USER)

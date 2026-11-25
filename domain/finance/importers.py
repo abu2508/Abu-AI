@@ -18,6 +18,14 @@ MAX_PAGES = 30
 MAX_SHEETS = 3
 HEADER_SCAN_ROWS = 25
 
+
+class AmbiguousDirection(ImportFailed):
+    """A card statement whose amount sign carries no Dr/Cr marker, type column or Debit/Credit columns: refused whole."""
+
+
+_INR_CELL = {"inr", "rs", "rs.", "₹", "rupee", "rupees"}
+_DR_CR = re.compile(r"(?i)\b(cr|dr)\.?\s*$")
+
 _SYN = {
     "date": ("date", "txn date", "transaction date", "value date", "posting date", "tran date"),
     "desc": (
@@ -34,6 +42,7 @@ _SYN = {
     "type": ("type", "dr/cr", "cr/dr", "txn type", "transaction type"),
     "ref": ("ref no", "reference", "reference no", "chq/ref no", "utr", "ref", "cheque no"),
     "balance": ("balance", "closing balance", "running balance"),
+    "currency": ("currency", "ccy", "curr", "currency code"),
 }
 
 
@@ -72,7 +81,9 @@ def _getter(r: list[Any], header: dict[str, int]) -> Callable[[str], Any]:
     return get
 
 
-def rows_to_txns(rows: list[list[Any]], result: ImportResult, today: date) -> None:
+def rows_to_txns(
+    rows: list[list[Any]], result: ImportResult, today: date, account_kind: str = "bank"
+) -> None:
     header: dict[str, int] | None = None
     start = 0
     for i, r in enumerate(rows[:HEADER_SCAN_ROWS]):
@@ -103,16 +114,39 @@ def rows_to_txns(rows: list[list[Any]], result: ImportResult, today: date) -> No
                     else Decimal(0)
                 )
             else:
-                amt = parse_amount(get("amount") or "")
+                cell = get("amount")
+                amt = parse_amount(cell or "")
                 t = str(get("type") or "").strip().lower()
-                if t in ("dr", "debit", "d"):
+                typed = (
+                    "debit"
+                    if t in ("dr", "debit", "d")
+                    else "credit"
+                    if t in ("cr", "credit", "c")
+                    else None
+                )
+                m = _DR_CR.search(cell) if isinstance(cell, str) else None
+                marked = (
+                    None if m is None else ("debit" if m.group(1).lower() == "dr" else "credit")
+                )
+                if marked and typed and marked != typed:
+                    raise ParseError(
+                        "ambiguous_direction"
+                    )  # the suffix and the type column disagree
+                side = marked or typed
+                if side == "debit":
                     debit = abs(amt)
-                elif t in ("cr", "credit", "c"):
+                elif side == "credit":
                     credit = abs(amt)
+                elif account_kind == "credit_card":
+                    # Card exports disagree on the sign convention (purchases positive vs negative): never guess.
+                    raise AmbiguousDirection("ambiguous_card_amount_sign")
                 elif amt < 0:
                     debit = -amt
                 else:
                     credit = amt
+            cur = get("currency")
+            if str(cur or "").strip() and str(cur).strip().lower() not in _INR_CELL:
+                raise ParseError("unsupported_currency")  # V1 is INR only
             if (debit > 0) == (credit > 0):  # both or neither: ambiguous, refuse
                 raise ParseError("ambiguous_direction")
             ref = str(get("ref") or "").strip() or None
@@ -147,7 +181,7 @@ def _decode(data: bytes) -> str:
     raise ImportFailed("undecodable")
 
 
-def import_csv(data: bytes, today: date | None = None) -> ImportResult:
+def import_csv(data: bytes, today: date | None = None, account_kind: str = "bank") -> ImportResult:
     if len(data) > MAX_BYTES:
         raise ImportFailed("file_too_large")
     text = _decode(data)
@@ -164,11 +198,11 @@ def import_csv(data: bytes, today: date | None = None) -> ImportResult:
             strict=False,
         )
     ]
-    rows_to_txns(rows, result, today or date.today())
+    rows_to_txns(rows, result, today or date.today(), account_kind)
     return result
 
 
-def import_xlsx(data: bytes, today: date | None = None) -> ImportResult:
+def import_xlsx(data: bytes, today: date | None = None, account_kind: str = "bank") -> ImportResult:
     if len(data) > MAX_BYTES:
         raise ImportFailed("file_too_large")
     from openpyxl import load_workbook
@@ -192,8 +226,10 @@ def import_xlsx(data: bytes, today: date | None = None) -> ImportResult:
                 )
             ]
             try:
-                rows_to_txns(rows, result, today or date.today())
+                rows_to_txns(rows, result, today or date.today(), account_kind)
                 found = True
+            except AmbiguousDirection:
+                raise
             except ImportFailed:
                 continue
         if not found:
@@ -209,7 +245,7 @@ _PDF_ROW = re.compile(
 _MONEY = re.compile(r"(?<![\w.])\(?-?[0-9][0-9,]*\.[0-9]{2}\)?(?:\s?(?:Cr|Dr))?(?![\w.])", re.I)
 
 
-def import_pdf(data: bytes, today: date | None = None) -> ImportResult:
+def import_pdf(data: bytes, today: date | None = None, account_kind: str = "bank") -> ImportResult:
     if len(data) > MAX_BYTES:
         raise ImportFailed("file_too_large")
     from pypdf import PdfReader
@@ -246,7 +282,13 @@ def import_pdf(data: bytes, today: date | None = None) -> ImportResult:
             before, prev_balance = prev_balance, (bal if bal is not None else prev_balance)
             if explicit:
                 direction = "credit" if explicit.group(1).lower() == "cr" else "debit"
-            elif bal is not None and before is not None and bal != before:
+            elif (
+                bal is not None
+                and before is not None
+                and bal != before
+                and account_kind != "credit_card"
+            ):
+                # a running balance moves the other way on a card (it is what is OWED), so it is not used there
                 direction = "credit" if bal > before else "debit"
             else:
                 raise ParseError("ambiguous_direction")

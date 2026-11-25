@@ -30,12 +30,15 @@ ORCHESTRATOR_ERROR_CODES = (
 DOMAIN_ERROR_CODES = (
     "already_checked_in",
     "already_imported",
+    "ambiguous_card_amount_sign",
+    "category_required",
     "conversation_full",
     "credit_limit_required",
     "import_failed",
     "invalid_category",
     "invalid_channel",
     "invalid_date",
+    "invalid_emi_split",
     "invalid_format",
     "invalid_hours",
     "invalid_loan",
@@ -43,6 +46,7 @@ DOMAIN_ERROR_CODES = (
     "invalid_timezone",
     "not_found",
     "not_shared",
+    "unsupported_currency",
 )
 
 

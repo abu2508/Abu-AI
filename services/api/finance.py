@@ -78,6 +78,18 @@ class CategoryIn(Body):
     remember: bool = False
 
 
+class EmiSplitIn(Body):
+    """A user-supplied principal/interest split of an EMI debit. Validated again by the service (they must add up)."""
+
+    principal: Annotated[
+        Decimal, Field(ge=0, le=Decimal("999999999.99"), max_digits=12, decimal_places=2)
+    ]
+    interest: Annotated[
+        Decimal, Field(ge=0, le=Decimal("999999999.99"), max_digits=12, decimal_places=2)
+    ]
+    loan_id: uuid.UUID | None = None
+
+
 class BudgetIn(Body):
     category: str
     monthly_limit: Amount
@@ -359,6 +371,28 @@ async def set_category(
     async def go() -> Any:
         return _json(
             s.view(await s.set_category(principal.user_id, txn_id, body.category, body.remember))
+        )
+
+    return await _run(session, go)
+
+
+@router.post("/transactions/{txn_id}/emi-split")
+async def emi_split(
+    txn_id: uuid.UUID,
+    body: EmiSplitIn,
+    principal: PrincipalDep,
+    session: SessionDep,
+    cipher: CipherDep,
+) -> Any:
+    s = FinanceService(session, cipher)
+
+    async def go() -> Any:
+        return _json(
+            s.view(
+                await s.set_emi_split(
+                    principal.user_id, txn_id, body.principal, body.interest, body.loan_id
+                )
+            )
         )
 
     return await _run(session, go)
