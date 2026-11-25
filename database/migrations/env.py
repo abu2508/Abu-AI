@@ -1,4 +1,5 @@
-"""Alembic environment. URL comes from ABU_DATABASE_URL unless a caller sets sqlalchemy.url."""
+"""Alembic environment. The URL is, in order: a caller-set sqlalchemy.url, ABU_MIGRATION_DATABASE_URL (the OWNER role used
+by the bootstrap step), then ABU_DATABASE_URL (single-role development and CI)."""
 
 import os
 from logging.config import fileConfig
@@ -17,9 +18,15 @@ target_metadata = Base.metadata
 
 
 def _url() -> str:
-    url = config.get_main_option("sqlalchemy.url") or os.environ.get("ABU_DATABASE_URL")
+    url = (
+        config.get_main_option("sqlalchemy.url")
+        or os.environ.get("ABU_MIGRATION_DATABASE_URL")
+        or os.environ.get("ABU_DATABASE_URL")
+    )
     if not url:
-        raise RuntimeError("Set ABU_DATABASE_URL (postgresql+psycopg://...) to run migrations.")
+        raise RuntimeError(
+            "Set ABU_MIGRATION_DATABASE_URL (owner role) or ABU_DATABASE_URL (postgresql+psycopg://...) to run migrations."
+        )
     return url
 
 

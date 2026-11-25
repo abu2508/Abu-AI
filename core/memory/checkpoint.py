@@ -84,8 +84,15 @@ def checkpoint_dsn(database_url: str) -> str:
 
 
 async def open_checkpointer(
-    database_url: str, envelope: Envelope, *, min_size: int = 1, max_size: int = 4
+    database_url: str,
+    envelope: Envelope,
+    *,
+    min_size: int = 1,
+    max_size: int = 4,
+    setup: bool = True,
 ) -> tuple[AsyncConnectionPool, EncryptedPostgresSaver]:
+    """`setup=False` is for a least-privilege runtime role: the tables already exist (the owner-run bootstrap step
+    created them with `provision_checkpoint_tables`) and this role has no DDL rights."""
     pool = AsyncConnectionPool(
         checkpoint_dsn(database_url),
         min_size=min_size,
@@ -102,5 +109,20 @@ async def open_checkpointer(
     saver = EncryptedPostgresSaver(
         cast(Any, pool), serde=StrictEncryptedSerializer(EnvelopeCipher(envelope))
     )
-    await saver.setup()  # idempotent: LangGraph's own migrations, inside lg_checkpoints
+    if setup:
+        await saver.setup()  # idempotent: LangGraph's own migrations, inside lg_checkpoints
     return pool, saver
+
+
+def provision_checkpoint_tables(owner_database_url: str) -> None:
+    """Create/upgrade LangGraph's checkpoint tables as the OWNER role (bootstrap step only; never the runtime role).
+    Uses the library's own migrations, so the result is identical to what `saver.setup()` would create."""
+    import psycopg
+    from langgraph.checkpoint.postgres import PostgresSaver
+
+    with psycopg.connect(
+        checkpoint_dsn(owner_database_url), autocommit=True, row_factory=dict_row
+    ) as conn:
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
+        conn.execute(f'SET search_path TO "{SCHEMA}"')
+        PostgresSaver(cast(Any, conn)).setup()

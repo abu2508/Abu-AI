@@ -1,9 +1,10 @@
 """Abu AI API entrypoint. Run with:  uvicorn --factory services.api.main:create_app"""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agents.tools import ToolDeps, build_registry
 from agents.workflows import domain_registry
@@ -34,7 +35,13 @@ from services.api.middleware import (
 from services.api.ratelimit import RateLimiter
 
 
-def create_app(settings: Settings | None = None, limiter: RateLimiter | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    limiter: RateLimiter | None = None,
+    *,
+    startup_check: Callable[[AsyncEngine], Awaitable[None]] | None = None,
+) -> FastAPI:
+    """`startup_check` (staging/production, via services.api.entrypoint) runs against the engine before the app serves."""
     settings = settings or get_settings()
     settings.require_auth_secrets()  # fail fast: never start without (distinct, strong) auth secrets
     limiter = limiter or RateLimiter()
@@ -45,6 +52,8 @@ def create_app(settings: Settings | None = None, limiter: RateLimiter | None = N
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = create_engine(settings)
         app.state.sessionmaker = create_sessionmaker(app.state.engine)
+        if startup_check is not None and app.state.engine is not None:
+            await startup_check(app.state.engine)
         app.state.memory = None
         app.state.orchestrator = None
         try:

@@ -96,7 +96,11 @@ def build_embedder(
             "retention, training practices and pricing are approved"
         )
     embedder = spec.factory()
-    if not embedder.is_semantic and env == "production" and not allow_test_in_production:
+    if (
+        not embedder.is_semantic
+        and env in ("production", "staging")
+        and not allow_test_in_production
+    ):
         raise EmbeddingConfigError(
             f"embedder {name!r} is a TEST embedder (lexical, not semantic) and is not allowed in production "
             "without ABU_ALLOW_TEST_EMBEDDER_IN_PRODUCTION=true"

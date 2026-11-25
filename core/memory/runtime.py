@@ -30,9 +30,9 @@ def build_keyring(settings: Settings) -> KeyRing:
             strict_permissions=settings.memory_keyring_strict_permissions,
         )
     if settings.memory_kek is not None:
-        if settings.env == "production":
+        if settings.env in ("production", "staging"):
             raise KeyUnavailableError(
-                "production requires a keyring FILE (ABU_MEMORY_KEYRING_FILE), not an env key"
+                "production and staging require a keyring FILE (ABU_MEMORY_KEYRING_FILE), not an env key"
             )
         return KeyRing.from_b64(settings.memory_kek.get_secret_value())
     raise KeyUnavailableError(
@@ -128,6 +128,8 @@ async def open_runtime(settings: Settings, *, with_checkpointer: bool = True) ->
     rt = MemoryRuntime(envelope, embedder, MemoryPolicy.from_settings(settings), default_registry())
     if with_checkpointer and settings.database_url is not None:
         rt.pool, rt.saver = await open_checkpointer(
-            settings.database_url.get_secret_value(), envelope
+            settings.database_url.get_secret_value(),
+            envelope,
+            setup=settings.checkpoint_auto_setup,
         )
     return rt

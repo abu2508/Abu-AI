@@ -360,6 +360,16 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict[str, Handler]]:
     mem.add_argument("--confirm")
     mem.add_argument("--file")
     mem.add_argument("--id")
+    db = sub.add_parser(
+        "db",
+        help="owner-side provisioning (migrations, checkpoint tables, runtime grants); needs ABU_MIGRATION_DATABASE_URL",
+    )
+    db.add_argument("action", choices=["bootstrap"])
+    db.add_argument(
+        "--runtime-role",
+        default=None,
+        help="runtime role to grant DML to (default: ABU_RUNTIME_DB_ROLE, else the user of ABU_DATABASE_URL)",
+    )
     oa = sub.add_parser("openapi", help="offline OpenAPI schema snapshot (no server involved)")
     oa.add_argument("action", choices=["export", "check"])
     oa.add_argument("--out", default="mobile/openapi/openapi.json")
@@ -392,6 +402,30 @@ def openapi_cmd(a: argparse.Namespace) -> None:
         print("snapshot is current")
 
 
+def db_cmd(a: argparse.Namespace) -> None:
+    """Host-side like `openapi`: uses the OWNER url only; no auth secrets, no application session."""
+    import os
+
+    from database import provision
+
+    owner = os.environ.get("ABU_MIGRATION_DATABASE_URL")
+    if not owner:
+        raise SystemExit("ABU_MIGRATION_DATABASE_URL (the owner role) is not set")
+    role = a.runtime_role or os.environ.get("ABU_RUNTIME_DB_ROLE")
+    if not role:
+        runtime_url = os.environ.get("ABU_DATABASE_URL")
+        if not runtime_url:
+            raise SystemExit("name the runtime role: --runtime-role or ABU_RUNTIME_DB_ROLE")
+        role = provision.runtime_role_from_url(runtime_url)
+    try:
+        provision.bootstrap(owner, role)
+    except provision.ProvisionError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(
+        f"bootstrap complete: migrations at head, checkpoint tables present, grants applied to role {role}"
+    )
+
+
 async def run(argv: list[str] | None = None) -> None:
     parser, handlers = build_parser()
     args = parser.parse_args(argv)
@@ -401,6 +435,9 @@ async def run(argv: list[str] | None = None) -> None:
         args.cmd == "openapi"
     ):  # host-side: builds the app object offline; needs no database or secrets
         openapi_cmd(args)
+        return
+    if args.cmd == "db":
+        db_cmd(args)
         return
     if args.cmd == "memory" and args.action == "add-key":
         if not (args.file and args.id):

@@ -12,12 +12,21 @@ MIN_SECRET_CHARS = 32
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ABU_", env_file=None, extra="ignore")
 
-    env: Literal["development", "test", "production"] = "development"
+    # "staging" is production-like (fail-closed deployment guard, keyring FILE, no OpenAPI) but may run with synthetic data
+    # and the explicitly allowed test embedder. Only "production" refuses the test embedder outright (gate G4).
+    env: Literal["development", "test", "staging", "production"] = "development"
     # OpenAPI is OFF everywhere by default. "authenticated" serves the schema at /v1/dev/openapi.json behind the
     # normal bearer authentication (development/test only). Swagger UI and ReDoc do not exist in any mode.
     openapi_mode: Literal["off", "authenticated"] = "off"
     # SQLAlchemy async URL, e.g. postgresql+psycopg://user:pw@db:5432/abu_ai
+    # This is the RUNTIME role: in staging/production it must have no DDL privileges (see docs/operations/DATABASE_ROLES.md).
     database_url: SecretStr | None = None
+    # The OWNER role used only by the one-shot migration/bootstrap step (alembic, checkpoint tables, grants). It must
+    # NOT be present in the API or admin runtime environment; the deployment guard refuses to start if it is.
+    migration_database_url: SecretStr | None = None
+    # LangGraph's saver creates its tables at startup (DDL). A least-privilege runtime role cannot do that, so
+    # staging/production set this to false and the bootstrap step creates the tables as the owner.
+    checkpoint_auto_setup: bool = True
     litellm_master_key: SecretStr | None = None
     litellm_base_url: str = "http://litellm:4000"
     # Short timeouts so health checks never hang the API.
@@ -81,8 +90,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _openapi_never_in_production(self) -> "Settings":
         """Fail closed: the schema may be served (authenticated) only in development/test, never in production."""
-        if self.env == "production" and self.openapi_mode != "off":
-            raise ValueError("ABU_OPENAPI_MODE must be 'off' when ABU_ENV=production")
+        if self.env in ("production", "staging") and self.openapi_mode != "off":
+            raise ValueError("ABU_OPENAPI_MODE must be 'off' when ABU_ENV is production or staging")
         return self
 
     def require_auth_secrets(self) -> tuple[SecretStr, SecretStr]:
