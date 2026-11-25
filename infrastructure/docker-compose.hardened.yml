@@ -43,6 +43,10 @@ services:
     logging: *logging
 
   litellm:
+    # No route to the internet. The only model is a mock, so nothing needs one; and the pinned gateway image carries many
+    # known advisories (docs/operations/SECURITY_EXCEPTIONS.md), so a compromise must not be able to call out. Re-adding
+    # `egress` is a deliberate step taken only after a provider is approved (gate G4) and the image is upgraded.
+    networks: !override [data]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     mem_limit: ${LITELLM_MEM_LIMIT:-1g}

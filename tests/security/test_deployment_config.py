@@ -104,6 +104,11 @@ def test_dockerfile_records_release_identity_and_starts_the_guarded_entrypoint()
     assert "org.opencontainers.image.revision" in d and "ARG GIT_SHA" in d and "ARG VERSION" in d
     assert "services.api.entrypoint:create_checked_app" in d
     assert "USER abu" in d and "--no-server-header" in d and "--timeout-graceful-shutdown" in d
+    # no package manager in the runtime image: its vendored libraries are inherited advisories and a tool for an attacker
+    assert "pip uninstall -y pip" in d and "site-packages/pip" in d
+    assert d.index("uv sync") < d.index(
+        "pip uninstall"
+    )  # dependencies are installed first, then pip is removed
 
 
 @pytest.mark.parametrize("name", ["Caddyfile.staging", "Caddyfile.production"])
@@ -161,6 +166,16 @@ def test_the_api_is_internal_only_and_has_no_internet_route(env: str, tmp_path: 
     for net in ("data", "proxy"):
         assert cfg["networks"][net]["internal"] is True, f"{net} must be an internal network"
     assert set(cfg["services"]["caddy"]["networks"]) == {"proxy", "edge"}
+
+
+@needs_docker
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_the_model_gateway_has_no_internet_route(env: str, tmp_path: Path) -> None:
+    cfg = _resolved(env, tmp_path)
+    assert set(cfg["services"]["litellm"]["networks"]) == {"data"}
+    assert "OPENAI_API_KEY" not in str(
+        cfg["services"]["litellm"].get("environment")
+    )  # no provider keys either
 
 
 @needs_docker

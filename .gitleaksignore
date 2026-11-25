@@ -1,0 +1,10 @@
+# gitleaks: reviewed findings that are NOT secrets. Fingerprint-exact on purpose (commit:file:rule:line), so a new
+# finding anywhere, including the same file at another line or commit, still fails the secret-scan job.
+# Each entry was reviewed on 2026-11-25 (Phase 1, P1.7). Add an entry only after reading the finding and recording why.
+
+# synthetic string in a redaction unit test (the test asserts it is removed)
+48b1ce26023440193e8d50943353b168c830c0c3:tests/unit/test_logging_telemetry.py:generic-api-key:57
+# code reference `body.refresh_token` (a request field name), not a value
+b0f416dc2cb9e5b47aef3d33f4a5f9edd40b12cf:services/api/auth/routes.py:generic-api-key:81
+# test fixture value 'rt_abcdef012345', not a credential
+eb1812c9aa32d2464af709ecb6b8d724881000e9:mobile/tests/auth/storage.test.ts:generic-api-key:18

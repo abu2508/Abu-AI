@@ -10,6 +10,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e5975500
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
+# The runtime has no package manager. Dependencies are installed above by uv into /app/.venv; the base image's own pip (and
+# the setuptools/wheel it may carry) is never used at runtime and carries vendored libraries (msgpack, urllib3, ...) whose
+# advisories would otherwise be inherited. Removing it also takes pip away from anyone who gains code execution.
+RUN python -m pip uninstall -y pip setuptools wheel >/dev/null 2>&1 || true \
+ && rm -rf /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13 \
+           /usr/local/lib/python3.13/site-packages/pip /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
+           /usr/local/lib/python3.13/site-packages/setuptools* /usr/local/lib/python3.13/site-packages/wheel*
 
 FROM base AS runtime
 COPY services ./services

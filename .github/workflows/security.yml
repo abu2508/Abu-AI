@@ -1,0 +1,113 @@
+name: security
+
+# Supply-chain and security checks (Phase 1, P1.7). Five independent jobs; every blocking job fails the run.
+#   dependency-audit  known vulnerabilities in the locked Python dependencies (production set and all groups)
+#   sast              Bandit static analysis of the application code (every severity blocks; no `# nosec` is used)
+#   secret-scan       gitleaks over the full git history (reviewed false positives are fingerprint-exact in .gitleaksignore)
+#   image-scan        Trivy on the API image we build: fixable HIGH/CRITICAL blocks; the full list (including findings with
+#                     no upstream fix yet) is always printed; third-party images are reported, not blocking
+#   actions-lint      actionlint plus the repository's own checks (SHA pinning, read-only permissions, timeouts)
+# Third-party tools run from DIGEST-PINNED container images or pinned versions, not from marketplace Actions.
+# Scheduled weekly: new advisories appear without any change to this repository.
+# Policy and accepted exceptions: docs/operations/SECURITY_EXCEPTIONS.md
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, 'claude/**']
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+env:
+  CI: 1
+  TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: '3.13'
+      - name: Export the locked dependency sets
+        run: |
+          uv export --frozen --no-dev --no-emit-project --no-hashes -o "$RUNNER_TEMP/requirements-prod.txt"
+          uv export --frozen --no-emit-project --no-hashes -o "$RUNNER_TEMP/requirements-all.txt"
+      - name: pip-audit (production dependencies, the ones in the image)
+        run: uvx --from pip-audit==2.9.0 pip-audit -r "$RUNNER_TEMP/requirements-prod.txt" --no-deps --disable-pip --strict --progress-spinner off
+      - name: pip-audit (all dependency groups, including development tools)
+        run: uvx --from pip-audit==2.9.0 pip-audit -r "$RUNNER_TEMP/requirements-all.txt" --no-deps --disable-pip --strict --progress-spinner off
+
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: '3.13'
+      - name: Bandit (all severities, all confidences; tests excluded because they assert)
+        run: uvx --from bandit==1.8.6 bandit -r services core domain agents database
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: gitleaks over the full history (values are redacted in the output)
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo
+          "$GITLEAKS_IMAGE" git --redact=100 --no-banner --verbose
+
+  image-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the API image
+        run: docker build -f services/api/Dockerfile --target runtime --build-arg GIT_SHA="$GITHUB_SHA" -t abu-api:scan .
+      - name: Trivy, BLOCKING - fixable HIGH and CRITICAL vulnerabilities in the API image (OS and Python packages)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$RUNNER_TEMP/trivy:/root/.cache"
+          "$TRIVY_IMAGE" image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress abu-api:scan
+      - name: Trivy, REPORT - everything, including findings with no upstream fix yet (see SECURITY_EXCEPTIONS.md)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$RUNNER_TEMP/trivy:/root/.cache"
+          "$TRIVY_IMAGE" image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 --no-progress abu-api:scan
+      - name: Trivy, BLOCKING - HIGH and CRITICAL misconfigurations in the Dockerfile
+        run: >-
+          docker run --rm -v "$PWD/services/api:/src:ro" -v "$RUNNER_TEMP/trivy:/root/.cache"
+          "$TRIVY_IMAGE" config --severity HIGH,CRITICAL --exit-code 1 /src
+      - name: Third-party images we pin (REPORT only - not ours to patch; each is tracked in SECURITY_EXCEPTIONS.md)
+        run: |
+          grep -hoE 'image: *[^ ]+@sha256:[0-9a-f]{64}' infrastructure/docker-compose*.yml | sed -E 's/image: *//' | sort -u | while read -r image; do
+            echo "::group::$image"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$RUNNER_TEMP/trivy:/root/.cache" \
+              "$TRIVY_IMAGE" image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 --no-progress "$image" || true
+            echo "::endgroup::"
+          done
+
+  actions-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: '3.13'
+      - name: Repository workflow rules (SHA pinning, read-only permissions, timeouts, no injection-prone expressions)
+        run: |
+          uv sync --frozen
+          uv run --no-sync pytest tests/security/test_workflows.py -q

@@ -1,0 +1,52 @@
+# Dependency update automation (Phase 1, P1.7). Updates arrive as PULL REQUESTS: nothing is merged automatically, and every
+# update goes through the required checks in docs/operations/RELEASE.md. Pins by digest/SHA are refreshed by these PRs, so
+# "pinned" does not mean "stale". Security updates for vulnerable dependencies are raised separately by GitHub when
+# Dependabot security updates are enabled (owner action, see docs/operations/RELEASE.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: npm
+    directory: /mobile
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(mobile-deps)"
+    # The Expo SDK pins its own dependency set (docs/mobile/SDK58_DEPENDENCY_DIFF.md); SDK-managed packages move with the SDK.
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "react"
+      - dependency-name: "react-native"
+  - package-ecosystem: docker
+    directory: /services/api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "build(deps)"
+  - package-ecosystem: docker-compose
+    directory: /infrastructure
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "build(deps)"

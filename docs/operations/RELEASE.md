@@ -107,8 +107,9 @@ A running deployment must be identifiable without trusting anyone's memory:
 
 - Container images are built with the OCI labels `org.opencontainers.image.revision` (git SHA) and `.version` (tag), supplied
   as build arguments (see `services/api/Dockerfile`).
-- Deployments reference images **by digest**, recorded in `infrastructure/image-digests.env` (see
-  `docs/operations/DEPLOYMENT.md`).
+- Every image is referenced **by digest**: the third-party images in the Compose files and the base images in
+  `services/api/Dockerfile` carry `@sha256:` pins (enforced by tests); our own API image is deployed by the digest recorded in
+  the release tag message (see `docs/operations/DEPLOYMENT.md`).
 - The deployed revision is read from the image (`docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`)
   and the database revision from `alembic current` (run in the `migrate` service); both are compared with the release notes
   before and after every deploy. (`services.admin version ...` manages *agent* versions and is unrelated.)
