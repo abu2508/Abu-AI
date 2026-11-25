@@ -29,6 +29,12 @@ they are **not** an estimate for a real database. **Not yet evidenced:** a resto
 dataset, an off-host copy, and a wall-clock RTO from "alert" to "service back". Those are **BLOCKED on the VPS**
 (`docs/operations/VPS_ASSESSMENT.md`).
 
+> **Tool versions.** Dump and restore with the **same PostgreSQL major version as the server**. A dump written by a newer
+> client can contain settings an older server rejects (found in CI: `unrecognized configuration parameter
+> "transaction_timeout"` when a PostgreSQL 17+ `pg_dump` wrote the dump and a 16 server restored it). The procedures below run
+> `pg_dump` and `pg_restore` **inside the `db` container**, which always matches; if you run them from the host, install the
+> matching client (`postgresql-client-16`). The rehearsal test refuses a mismatched client (and fails in CI).
+
 ## 3. One-time setup (operator)
 
 ```bash

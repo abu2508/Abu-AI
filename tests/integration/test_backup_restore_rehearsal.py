@@ -11,6 +11,7 @@ by this test.
 import asyncio
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -41,12 +42,35 @@ sys.modules["abu_backup"] = ab
 spec.loader.exec_module(ab)
 eb = ab.eb
 
+
+def _server_major() -> int:
+    assert ADMIN_URL is not None
+    with psycopg.connect(_dsn(make_url(ADMIN_URL))) as c:
+        return int(c.execute("SHOW server_version_num").fetchone()[0]) // 10000
+
+
+def _client(name: str, major: int) -> str:
+    """The pg_dump/pg_restore of the SAME major version as the server. A dump written by a newer client can contain settings
+    an older server rejects (for example `transaction_timeout`), so a mismatched client is not a valid rehearsal. In CI a
+    missing matching client FAILS the test (the workflow installs it); locally it skips with the reason."""
+    for candidate in (
+        Path(f"/usr/lib/postgresql/{major}/bin/{name}"),
+        Path(shutil.which(name) or "/nonexistent"),
+    ):
+        if candidate.exists():
+            out = subprocess.run(
+                [str(candidate), "--version"], capture_output=True, text=True, check=False
+            ).stdout  # noqa: S603
+            if re.search(rf"\) {major}\.", out):
+                return str(candidate)
+    msg = f"no {name} {major}.x client found: the dump and restore tools must match the server's major version"
+    if os.environ.get("CI"):
+        pytest.fail(msg)
+    pytest.skip(msg)
+
+
 pytestmark = [
     pytest.mark.skipif(ADMIN_URL is None, reason="ABU_TEST_ADMIN_URL not set"),
-    pytest.mark.skipif(
-        shutil.which("pg_dump") is None or shutil.which("pg_restore") is None,
-        reason="PostgreSQL client tools (pg_dump, pg_restore) not installed",
-    ),
 ]
 
 
@@ -66,7 +90,7 @@ async def _serve(url, keyring_file: str):
     return app, settings, sessions, engine
 
 
-def _restore(backup: Path, key_file: str, target_url) -> None:
+def _restore(backup: Path, key_file: str, target_url, pg_restore: str) -> None:
     """decrypt (authenticated) | pg_restore into the target: exactly the documented operator pipeline."""
     with backup.open("rb") as src:
         dec = subprocess.Popen(  # noqa: S603
@@ -81,7 +105,7 @@ def _restore(backup: Path, key_file: str, target_url) -> None:
             stdout=subprocess.PIPE,
         )
         restore = subprocess.run(  # noqa: S603
-            ["pg_restore", "--exit-on-error", "--no-owner", "-d", _dsn(target_url)],
+            [pg_restore, "--exit-on-error", "--no-owner", "-d", _dsn(target_url)],
             stdin=dec.stdout,
             capture_output=True,
             text=True,
@@ -155,13 +179,18 @@ async def test_backup_restore_and_keyring_recovery_rehearsal(
     eb.genkey(k2)
     dest = tmp_path / "backups"
     t0 = time.monotonic()
-    res = ab.run_backup(["pg_dump", "-Fc", "--no-owner", "-d", _dsn(migrated_url)], k1, dest)
+    major = _server_major()
+    pg_dump, pg_restore = _client("pg_dump", major), _client("pg_restore", major)
+    toc = [pg_restore, "--list"]
+    res = ab.run_backup(
+        [pg_dump, "-Fc", "--no-owner", "-d", _dsn(migrated_url)], k1, dest, list_argv=toc
+    )
     t["backup_s"] = time.monotonic() - t0
     assert res.offhost_ok is None and res.toc_entries > 50
     kb, ids = ab.backup_keyring(str(ring), k2, k1, dest)
     assert ids == ["k1"]
     assert ab.check_freshness(dest, 26)[0] == 0
-    assert ab.verify_backup(res.path, k1) == res.toc_entries
+    assert ab.verify_backup(res.path, k1, toc) == res.toc_entries
     raw = res.path.read_bytes()
     assert b"SYNTHETIC GROCERY MARKER" not in raw and b"Synthetic memory" not in raw
     assert secret_b64.encode() not in raw + kb.read_bytes()
@@ -177,7 +206,7 @@ async def test_backup_restore_and_keyring_recovery_rehearsal(
         c.execute(f'CREATE DATABASE "{new_db}"')
     try:
         t0 = time.monotonic()
-        await asyncio.to_thread(_restore, res.path, k1, restored_url)
+        await asyncio.to_thread(_restore, res.path, k1, restored_url, pg_restore)
         t["restore_s"] = time.monotonic() - t0
 
         with psycopg.connect(_dsn(restored_url)) as c:
