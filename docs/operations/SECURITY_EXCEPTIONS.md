@@ -90,10 +90,11 @@ Severity is the scanner's. "Blocks" says what the exception stops, so it cannot 
   HIGH/CRITICAL findings, re-run the compatibility tests, then (separately, G4) re-add egress to a provider allow-list.
 - **Owner decision needed:** schedule the LiteLLM upgrade (recommended as the first task of the next phase).
 
-### E-5  Local scan limits (not an exception to a finding, an honest gap)
-- The **complete API image** could not be built in the agent sandbox (its egress proxy breaks `uv sync` inside `docker build`),
-  so the local Trivy run covered the pinned base image and a derived image, not the final image. CI builds and scans the real
-  image on every run; its result is the authoritative one.
+### E-5  Scan limits (an honest gap, not an exception to a finding)
+- The **final API image was built and scanned in the sandbox** with a CA-injected copy of the Dockerfile that lives outside the
+  repository (the agent's egress proxy breaks `uv sync` inside `docker build`; the only difference from the CI image is one added
+  CA certificate). Result: **0 fixable HIGH/CRITICAL**; 53 HIGH with no upstream fix (E-1); 2 MEDIUM + 2 LOW fixable in Python
+  packages and the `uv` binary (informational). CI builds the committed, unmodified Dockerfile and its result is authoritative.
 - No SAST beyond Bandit and Ruff's `S` rules (CodeQL needs repository settings and, for private repositories, GitHub Advanced
   Security; owner decision).
 

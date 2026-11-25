@@ -4,9 +4,12 @@
 **personal messaging assistant** and a **daily coach** — built to run on a single modest VPS with a
 hard AI API budget of ₹0–₹300 per month.
 
-> Status: **Milestone 5 — hybrid memory.** No real model or embedding provider has been called, no
-> paid provider is enabled (spend is INR 0), no personal data leaves this deployment, and there is no
-> mobile app yet. See the roadmap below.
+> **Status (2026-11-25):** backend feature-complete through Milestone 7 and **S2.1A** (finance classification safety); mobile
+> app in progress (Milestone 8: native authenticated requests are **disabled**, requirements R1-R11 are not met). A Phase 1
+> production **foundation** exists (hardened Compose layers, role-separated database, encrypted backups with a rehearsed
+> restore, monitoring, supply-chain checks). **This is not production approval.** Everything runs with a mock model and
+> **synthetic data only**; no provider or paid model has ever been called (spend is INR 0); all four security gates
+> (G1-G4) are **BLOCKED**; no real personal data may be used. See [Operations and production readiness](#operations-and-production-readiness).
 
 ## Architecture (current)
 
@@ -577,6 +580,46 @@ Monthly paid spend defaults to **INR 0** with an absolute ceiling of **INR 300**
 described above. LiteLLM's `max_budget: 0.01` USD is only a secondary gateway guard, not the budget
 controller.
 
+## Operations and production readiness
+
+Operator documentation lives in [`docs/operations/`](docs/operations/):
+
+| Topic | Document |
+|---|---|
+| Is this ready for production? Gates, checklist, owner decisions | [PRODUCTION_READINESS.md](docs/operations/PRODUCTION_READINESS.md) |
+| Release process, branches, tags, rollback | [RELEASE.md](docs/operations/RELEASE.md) |
+| Architecture, staging procedure, updating pinned images | [DEPLOYMENT.md](docs/operations/DEPLOYMENT.md) |
+| Environments and every configuration variable | [ENVIRONMENT.md](docs/operations/ENVIRONMENT.md) |
+| VPS suitability assessment (script + criteria) and day-to-day operation | [VPS_ASSESSMENT.md](docs/operations/VPS_ASSESSMENT.md), [VPS_OPERATIONS.md](docs/operations/VPS_OPERATIONS.md) |
+| Owner/runtime database roles and migrations | [DATABASE_ROLES.md](docs/operations/DATABASE_ROLES.md) |
+| Encrypted backups, restore, RPO/RTO | [BACKUP_RESTORE.md](docs/operations/BACKUP_RESTORE.md) |
+| Keyring backup and recovery (gate G2) | [KEYRING_RECOVERY.md](docs/operations/KEYRING_RECOVERY.md) |
+| Checkpoint metadata review (gate G3) | [G3_CHECKPOINT_METADATA.md](docs/operations/G3_CHECKPOINT_METADATA.md) |
+| Monitoring, alerting, logs, retention | [MONITORING.md](docs/operations/MONITORING.md) |
+| Incidents | [INCIDENT_RESPONSE.md](docs/operations/INCIDENT_RESPONSE.md) |
+| Security scans, policy, accepted exceptions | [SECURITY_EXCEPTIONS.md](docs/operations/SECURITY_EXCEPTIONS.md) |
+
+Quick reference (staging, synthetic data, loopback only): `docker compose --env-file .env -p abu-ai-staging -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.hardened.yml -f infrastructure/docker-compose.staging.yml up -d --build`.
+The plain `docker compose -f infrastructure/docker-compose.yml ...` commands elsewhere in this file are the **development** setup.
+
+### Known limitations: Finance (carried forward from S2.1A)
+
+These are accepted, deliberate behaviours of the S2.1A baseline (`f95cff4`). They are not bugs to be silently fixed; any change
+needs its own approved milestone.
+
+1. **Bulk confirmation keeps its legacy behaviour for rows without a `review_reason`.** Unknown *debits* are not newly routed into
+   review; only new unknown *credits*, unlinked/ambiguous transfers and unverified EMIs are held (and those are excluded from bulk confirm).
+2. **Unsplit EMI can make the summary `net` overstate available cash.** A confirmed EMI debit without a reliable principal/interest
+   split counts in cash flow but is not recognised as an expense, and the summary contract is unchanged. **A finance UI must not
+   present `net` as available cash.**
+3. **Legacy EMI rows are not backfilled.** Rows created before migration 0012 keep their old behaviour; only an explicit user action
+   (re-categorising, confirming with a category, supplying an EMI split) moves a row into the new classification model. There is no
+   automatic historical reclassification.
+
+Also open from the S2.0 audit (not yet scheduled): FIN-04 (merchant fuzzy threshold), FIN-05 (reconciled alert status),
+FIN-06/06a (refund netting, silent duplicate alerts), FIN-07 (inconsistent EMI input), FIN-08 (balances/net worth),
+FIN-10, FIN-12, FIN-13 (locale), FIN-14 (decompression bound). No real bank statement or SMS format has been validated.
+
 ## Roadmap
 
 1. ✅ Repository and infrastructure foundation
@@ -584,7 +627,7 @@ controller.
 3. ✅ Authentication and the Agent Registry (versions, permissions, limits, audit)
 4. ✅ Governance and cost control (INR 300/month ledger, kill switch, execution records)
 5. ✅ Hybrid memory (encrypted, isolated, deletable; local test embedder)
-6. Orchestrator · 7. Domain agents · 8. Mobile app · 9. Testing and deployment
+6. ✅ Orchestrator (mock workflows) · 7. ✅ Domain agents (finance, messaging, coach) · 8. Mobile app (in progress; native authentication disabled) · 9. Testing and deployment (Phase 1 foundation done; **production not authorised**)
 
 ## Known issues and limitations
 
@@ -638,8 +681,8 @@ controller.
   The iOS app must keep the refresh token in the Keychain (`ThisDeviceOnly`).
 - **HS256 shared secret:** rotating `JWT_SECRET` ends all sessions.
 - **Enrollment is a manual, operator-issued code** (single-user by design).
-- Still not built: `model_versions`, `model_evaluations`, domain agents, mobile app. The orchestrator exists but runs mock workflows only.
+- Still not built: `model_versions`, `model_evaluations`. The domain agents and the orchestrator exist but run with the mock model only; the mobile app is in progress.
 - Registry tables are system-level (no `user_id`); user-owned tables will carry one.
 - Starlette emits a deprecation warning about `httpx` in `TestClient`; harmless.
-- Building the API image inside this agent's sandbox needed a CA workaround for its egress proxy; the
-  committed Dockerfile has no such change and has not been built unmodified here.
+- Building the API image inside the agent sandbox needs a CA workaround for its egress proxy (a copy of the Dockerfile kept outside
+  the repository); the committed Dockerfile has no such change and is built unmodified by CI.
