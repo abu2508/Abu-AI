@@ -15,6 +15,7 @@ from decimal import Decimal as D
 import pytest
 from sqlalchemy import text
 
+from database.schemas.finance import FinTransaction
 from domain.finance.analytics import add_months
 from domain.finance.service import FinanceService
 from tests.integration.conftest import Api
@@ -436,6 +437,41 @@ async def test_ambiguous_matches_stay_under_review(api: Api, device: Device) -> 
     await held(api, device, d1)  # candidates untouched
     await held(api, device, d2)
     await links_ok(api)
+
+
+async def test_an_apparently_unique_candidate_is_not_linked_when_its_own_partners_are_ambiguous(
+    api: Api, device: Device
+) -> None:
+    """MUTUAL uniqueness. The new credit sees exactly ONE candidate debit, but that debit has several eligible credits
+    of its own, so pairing the new credit with it would be a guess. Nothing may link; every leg stays reviewable."""
+    a, b, b2, b3 = (
+        await bank(api, device),
+        await bank(api, device, last4="9999"),
+        await bank(api, device, last4="7777"),
+        await bank(api, device, last4="6666"),
+    )
+    c2, _ = await add(api, device, b2, 4, "100.00", "credit", "SELF TRANSFER FROM X")
+    c3, _ = await add(api, device, b3, 4, "100.00", "credit", "SELF TRANSFER FROM Y")
+    d1, _ = await add(
+        api, device, a, 5, "100.00", "debit", "NEFT TO SELF"
+    )  # two credits fit it: ambiguous
+    await held(api, device, d1, "ambiguous_transfer")
+    # the new credit: exactly one candidate (d1) exists for it, and d1 is within its window
+    c, _ = await add(api, device, b, 6, "100.00", "credit", "SELF TRANSFER FROM Z")
+    async with api.sessions() as s:
+        svc = FinanceService(s, None)
+        credit = await s.get(FinTransaction, uuid.UUID(c))
+        assert [x.id for x in await svc._partners(device.user_id, credit)] == [uuid.UUID(d1)]
+        await s.rollback()
+    await held(api, device, c, "ambiguous_transfer")  # not linked, marked for review
+    await held(api, device, d1, "ambiguous_transfer")
+    await held(api, device, c2)  # the other legs are untouched and still reviewable
+    await held(api, device, c3)
+    await links_ok(api)
+    # every leg is still an ordinary pending row the owner can resolve explicitly
+    got = {t["id"]: t for t in await get(api, device, "/transactions", limit=500)}
+    assert all(got[i]["transfer_peer_id"] is None for i in (c, c2, c3, d1))
+    assert all(got[i]["status"] == "pending_review" for i in (c, c2, c3, d1))
 
 
 async def test_duplicate_suspects_are_never_link_candidates(api: Api, device: Device) -> None:
