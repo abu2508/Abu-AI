@@ -110,12 +110,6 @@ jobs:
           python-version: '3.13'
       - name: Install locked dependencies (including the dev group)
         run: uv sync --frozen
-      - name: PostgreSQL 16 client tools (the restore rehearsal needs pg_dump/pg_restore of the SAME major version as the server)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-16
-          /usr/lib/postgresql/16/bin/pg_dump --version
-          /usr/lib/postgresql/16/bin/pg_restore --version
       - name: Create the application and LiteLLM databases with the repository init script
         run: bash infrastructure/postgres/01-init.sh
       - name: pytest (whole tests/ tree)

@@ -23,8 +23,8 @@ Losing K1 loses the database backups. Losing K2 (and the live keyring) loses the
 | **RTO** (time to restore service) | **4 hours** for a single-user deployment | detect (<= 15 min with monitoring), prepare host, restore, verify, resume |
 | Retention | newest 14 daily, 8 weekly, 6 monthly | `abu_backup.py prune` defaults; dry run unless `--apply` |
 
-**Evidence that exists:** the isolated rehearsal (below) measured, on a **tiny synthetic** database (49 tables, 184 KB
-backup): backup 0.18 s, restore 0.29 s, keyring recovery under 0.01 s. These timings say the tooling has no hidden delay;
+**Evidence that exists:** the isolated rehearsal (below) measured, on a **tiny synthetic** database (49 tables, 143 KB
+backup): backup 0.67 s, restore 0.47 s (both include starting the tool container), keyring recovery under 0.01 s. These timings say the tooling has no hidden delay;
 they are **not** an estimate for a real database. **Not yet evidenced:** a restore on the actual VPS, a production-sized
 dataset, an off-host copy, and a wall-clock RTO from "alert" to "service back". Those are **BLOCKED on the VPS**
 (`docs/operations/VPS_ASSESSMENT.md`).
@@ -33,7 +33,8 @@ dataset, an off-host copy, and a wall-clock RTO from "alert" to "service back". 
 > client can contain settings an older server rejects (found in CI: `unrecognized configuration parameter
 > "transaction_timeout"` when a PostgreSQL 17+ `pg_dump` wrote the dump and a 16 server restored it). The procedures below run
 > `pg_dump` and `pg_restore` **inside the `db` container**, which always matches; if you run them from the host, install the
-> matching client (`postgresql-client-16`). The rehearsal test refuses a mismatched client (and fails in CI).
+> matching client (`postgresql-client-16`). The rehearsal test runs both tools from the pinned database image (version-matched by construction), so it needs no host
+> packages.
 
 ## 3. One-time setup (operator)
 

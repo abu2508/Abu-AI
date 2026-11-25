@@ -43,30 +43,54 @@ spec.loader.exec_module(ab)
 eb = ab.eb
 
 
-def _server_major() -> int:
+def _db_image() -> str:
+    """The PINNED database image from the Compose file: its pg_dump/pg_restore match the server by construction (the same
+    image the server runs), exactly as the documented procedure uses the tools inside the `db` container. A host client of a
+    different major version can write dumps an older server rejects (found in CI: `transaction_timeout`)."""
+    m = re.search(
+        r"image:\s*(pgvector/pgvector:pg16@sha256:[0-9a-f]{64})",
+        (ROOT / "infrastructure/docker-compose.yml").read_text(),
+    )
+    assert m, "the database image is not pinned in the Compose file"
+    return m.group(1)
+
+
+def _pg_tool(name: str, *args: str) -> list[str]:
+    """argv that runs a PostgreSQL client tool from the database image (stdin/stdout stay attached, host network)."""
+    if shutil.which("docker") is None:
+        msg = "docker is needed to run version-matched PostgreSQL client tools"
+        if os.environ.get("CI"):
+            pytest.fail(msg)
+        pytest.skip(msg)
     assert ADMIN_URL is not None
-    with psycopg.connect(_dsn(make_url(ADMIN_URL))) as c:
-        return int(c.execute("SHOW server_version_num").fetchone()[0]) // 10000
+    pw = make_url(ADMIN_URL).password or ""
+    return [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "host",
+        "-e",
+        f"PGPASSWORD={pw}",
+        _db_image(),
+        name,
+        *args,
+    ]
 
 
-def _client(name: str, major: int) -> str:
-    """The pg_dump/pg_restore of the SAME major version as the server. A dump written by a newer client can contain settings
-    an older server rejects (for example `transaction_timeout`), so a mismatched client is not a valid rehearsal. In CI a
-    missing matching client FAILS the test (the workflow installs it); locally it skips with the reason."""
-    for candidate in (
-        Path(f"/usr/lib/postgresql/{major}/bin/{name}"),
-        Path(shutil.which(name) or "/nonexistent"),
-    ):
-        if candidate.exists():
-            out = subprocess.run(
-                [str(candidate), "--version"], capture_output=True, text=True, check=False
-            ).stdout  # noqa: S603
-            if re.search(rf"\) {major}\.", out):
-                return str(candidate)
-    msg = f"no {name} {major}.x client found: the dump and restore tools must match the server's major version"
-    if os.environ.get("CI"):
-        pytest.fail(msg)
-    pytest.skip(msg)
+def _pg_conn_args(url) -> list[str]:
+    u = make_url(url)
+    return [
+        "-h",
+        u.host or "127.0.0.1",
+        "-p",
+        str(u.port or 5432),
+        "-U",
+        u.username or "",
+        "-d",
+        u.database or "",
+    ]
 
 
 pytestmark = [
@@ -90,7 +114,7 @@ async def _serve(url, keyring_file: str):
     return app, settings, sessions, engine
 
 
-def _restore(backup: Path, key_file: str, target_url, pg_restore: str) -> None:
+def _restore(backup: Path, key_file: str, target_url) -> None:
     """decrypt (authenticated) | pg_restore into the target: exactly the documented operator pipeline."""
     with backup.open("rb") as src:
         dec = subprocess.Popen(  # noqa: S603
@@ -105,7 +129,7 @@ def _restore(backup: Path, key_file: str, target_url, pg_restore: str) -> None:
             stdout=subprocess.PIPE,
         )
         restore = subprocess.run(  # noqa: S603
-            [pg_restore, "--exit-on-error", "--no-owner", "-d", _dsn(target_url)],
+            _pg_tool("pg_restore", "--exit-on-error", "--no-owner", *_pg_conn_args(target_url)),
             stdin=dec.stdout,
             capture_output=True,
             text=True,
@@ -179,12 +203,9 @@ async def test_backup_restore_and_keyring_recovery_rehearsal(
     eb.genkey(k2)
     dest = tmp_path / "backups"
     t0 = time.monotonic()
-    major = _server_major()
-    pg_dump, pg_restore = _client("pg_dump", major), _client("pg_restore", major)
-    toc = [pg_restore, "--list"]
-    res = ab.run_backup(
-        [pg_dump, "-Fc", "--no-owner", "-d", _dsn(migrated_url)], k1, dest, list_argv=toc
-    )
+    toc = _pg_tool("pg_restore", "--list")
+    dump = _pg_tool("pg_dump", "-Fc", "--no-owner", *_pg_conn_args(migrated_url))
+    res = ab.run_backup(dump, k1, dest, list_argv=toc)
     t["backup_s"] = time.monotonic() - t0
     assert res.offhost_ok is None and res.toc_entries > 50
     kb, ids = ab.backup_keyring(str(ring), k2, k1, dest)
@@ -206,7 +227,7 @@ async def test_backup_restore_and_keyring_recovery_rehearsal(
         c.execute(f'CREATE DATABASE "{new_db}"')
     try:
         t0 = time.monotonic()
-        await asyncio.to_thread(_restore, res.path, k1, restored_url, pg_restore)
+        await asyncio.to_thread(_restore, res.path, k1, restored_url)
         t["restore_s"] = time.monotonic() - t0
 
         with psycopg.connect(_dsn(restored_url)) as c:
