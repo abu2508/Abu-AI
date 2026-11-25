@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 MAX_BYTES = 1_000_000
 MAX_MESSAGES = 5000
 MAX_BODY = 4000
-_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f​-‏‪-‮⁦-⁩]")
+_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 
 
 class ImportError_(Exception):
@@ -61,7 +61,7 @@ def parse_whatsapp_export(text: str, my_name: str) -> list[ParsedMessage]:
             out.append(ParsedMessage(meta[0], meta[1], body))
 
     for line in text.splitlines():
-        m = _WA.match(line.strip("‎"))
+        m = _WA.match(line.strip("\u200e"))
         if m:
             flush()
             who = m.group("who").strip().casefold()
